@@ -1,0 +1,242 @@
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{info, error};
+
+pub mod api_manager;
+pub mod research_engine;
+pub mod data_persistence;
+pub mod monitoring;
+pub mod security;
+
+use crate::error::{AppError, AppResult};
+use api_manager::ApiManagerService;
+use research_engine::ResearchEngineService;
+use data_persistence::DataPersistenceService;
+use monitoring::MonitoringService;
+use security::SecurityService;
+
+/// Central service manager that coordinates all application services
+#[derive(Clone)]
+pub struct ServiceManager {
+    pub api_manager: Arc<RwLock<ApiManagerService>>,
+    pub research_engine: Arc<RwLock<ResearchEngineService>>,
+    pub data_persistence: Arc<RwLock<DataPersistenceService>>,
+    pub monitoring: Arc<RwLock<MonitoringService>>,
+    pub security: Arc<RwLock<SecurityService>>,
+}
+
+impl ServiceManager {
+    /// Create a new service manager and initialize all services
+    pub async fn new() -> AppResult<Self> {
+        info!("Initializing service manager...");
+        
+        // Initialize security service first (required by others)
+        let security = SecurityService::new().await?;
+        let security = Arc::new(RwLock::new(security));
+        
+        // Initialize data persistence service
+        let data_persistence = DataPersistenceService::new(security.clone()).await?;
+        let data_persistence = Arc::new(RwLock::new(data_persistence));
+        
+        // Initialize monitoring service
+        let monitoring = MonitoringService::new().await?;
+        let monitoring = Arc::new(RwLock::new(monitoring));
+        
+        // Initialize API manager service
+        let api_manager = ApiManagerService::new(
+            data_persistence.clone(),
+            security.clone(),
+            monitoring.clone(),
+        ).await?;
+        let api_manager = Arc::new(RwLock::new(api_manager));
+        
+        // Initialize research engine service
+        let research_engine = ResearchEngineService::new(
+            api_manager.clone(),
+            data_persistence.clone(),
+            monitoring.clone(),
+        ).await?;
+        let research_engine = Arc::new(RwLock::new(research_engine));
+        
+        let service_manager = Self {
+            api_manager,
+            research_engine,
+            data_persistence,
+            monitoring,
+            security,
+        };
+        
+        // Start background services
+        service_manager.start_background_services().await?;
+        
+        info!("Service manager initialized successfully");
+        Ok(service_manager)
+    }
+    
+    /// Start background services and monitoring
+    async fn start_background_services(&self) -> AppResult<()> {
+        info!("Starting background services...");
+        
+        // Start monitoring service
+        {
+            let monitoring = self.monitoring.read().await;
+            monitoring.start_monitoring().await?;
+        }
+        
+        // Start API manager background tasks
+        {
+            let api_manager = self.api_manager.read().await;
+            api_manager.start_background_tasks().await?;
+        }
+        
+        // Start data persistence background tasks (backups, cleanup)
+        {
+            let data_persistence = self.data_persistence.read().await;
+            data_persistence.start_background_tasks().await?;
+        }
+        
+        info!("Background services started successfully");
+        Ok(())
+    }
+    
+    /// Perform health check on all services
+    pub async fn health_check(&self) -> AppResult<ServiceHealthStatus> {
+        let mut status = ServiceHealthStatus::default();
+        
+        // Check security service
+        match self.security.read().await.health_check().await {
+            Ok(_) => status.security = ServiceStatus::Healthy,
+            Err(e) => {
+                error!("Security service health check failed: {}", e);
+                status.security = ServiceStatus::Unhealthy;
+            }
+        }
+        
+        // Check data persistence service
+        match self.data_persistence.read().await.health_check().await {
+            Ok(_) => status.data_persistence = ServiceStatus::Healthy,
+            Err(e) => {
+                error!("Data persistence service health check failed: {}", e);
+                status.data_persistence = ServiceStatus::Unhealthy;
+            }
+        }
+        
+        // Check monitoring service
+        match self.monitoring.read().await.health_check().await {
+            Ok(_) => status.monitoring = ServiceStatus::Healthy,
+            Err(e) => {
+                error!("Monitoring service health check failed: {}", e);
+                status.monitoring = ServiceStatus::Unhealthy;
+            }
+        }
+        
+        // Check API manager service
+        match self.api_manager.read().await.health_check().await {
+            Ok(_) => status.api_manager = ServiceStatus::Healthy,
+            Err(e) => {
+                error!("API manager service health check failed: {}", e);
+                status.api_manager = ServiceStatus::Unhealthy;
+            }
+        }
+        
+        // Check research engine service
+        match self.research_engine.read().await.health_check().await {
+            Ok(_) => status.research_engine = ServiceStatus::Healthy,
+            Err(e) => {
+                error!("Research engine service health check failed: {}", e);
+                status.research_engine = ServiceStatus::Unhealthy;
+            }
+        }
+        
+        Ok(status)
+    }
+    
+    /// Gracefully shutdown all services
+    pub async fn shutdown(&self) -> AppResult<()> {
+        info!("Shutting down service manager...");
+        
+        // Stop research engine first
+        {
+            let research_engine = self.research_engine.write().await;
+            research_engine.shutdown().await?;
+        }
+        
+        // Stop API manager
+        {
+            let api_manager = self.api_manager.write().await;
+            api_manager.shutdown().await?;
+        }
+        
+        // Stop monitoring
+        {
+            let monitoring = self.monitoring.write().await;
+            monitoring.shutdown().await?;
+        }
+        
+        // Stop data persistence (ensure all data is saved)
+        {
+            let data_persistence = self.data_persistence.write().await;
+            data_persistence.shutdown().await?;
+        }
+        
+        // Stop security service last
+        {
+            let security = self.security.write().await;
+            security.shutdown().await?;
+        }
+        
+        info!("Service manager shutdown complete");
+        Ok(())
+    }
+}
+
+/// Service health status
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ServiceHealthStatus {
+    pub security: ServiceStatus,
+    pub data_persistence: ServiceStatus,
+    pub monitoring: ServiceStatus,
+    pub api_manager: ServiceStatus,
+    pub research_engine: ServiceStatus,
+}
+
+impl Default for ServiceHealthStatus {
+    fn default() -> Self {
+        Self {
+            security: ServiceStatus::Unknown,
+            data_persistence: ServiceStatus::Unknown,
+            monitoring: ServiceStatus::Unknown,
+            api_manager: ServiceStatus::Unknown,
+            research_engine: ServiceStatus::Unknown,
+        }
+    }
+}
+
+impl ServiceHealthStatus {
+    /// Check if all services are healthy
+    pub fn is_healthy(&self) -> bool {
+        matches!(self.security, ServiceStatus::Healthy)
+            && matches!(self.data_persistence, ServiceStatus::Healthy)
+            && matches!(self.monitoring, ServiceStatus::Healthy)
+            && matches!(self.api_manager, ServiceStatus::Healthy)
+            && matches!(self.research_engine, ServiceStatus::Healthy)
+    }
+}
+
+/// Individual service status
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum ServiceStatus {
+    Healthy,
+    Unhealthy,
+    Unknown,
+}
+
+/// Trait that all services must implement
+#[async_trait::async_trait]
+pub trait Service {
+    /// Perform a health check on the service
+    async fn health_check(&self) -> AppResult<()>;
+    
+    /// Gracefully shutdown the service
+    async fn shutdown(&self) -> AppResult<()>;
+}
