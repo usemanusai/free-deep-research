@@ -1,0 +1,81 @@
+{
+  "name": "free-deep-research-system",
+  "version": "1.0.0",
+  "description": "Enterprise-grade deep research system operating entirely on free service tiers",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "build:frontend": "vite build",
+    "build:windows": "tauri build --target x86_64-pc-windows-msvc",
+    "build:macos": "tauri build --target x86_64-apple-darwin",
+    "build:linux": "tauri build --target x86_64-unknown-linux-gnu",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@headlessui/react": "^1.7.17",
+    "@heroicons/react": "^2.0.18",
+    "@tauri-apps/api": "^1.5.3",
+    "@tanstack/react-query": "^5.17.19",
+    "axios": "^1.6.5",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.312.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.1",
+    "recharts": "^2.10.3",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.1",
+    "@tauri-apps/cli": "^1.5.8",
+    "@types/node": "^20.11.5",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "postcss": "^8.4.33",
+    "prettier": "^3.2.4",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "vitest": "^1.2.1"
+  },
+  "keywords": [
+    "research",
+    "api-management",
+    "desktop-application",
+    "tauri",
+    "rust",
+    "react",
+    "typescript",
+    "free-tier",
+    "enterprise",
+    "bmad-methodology"
+  ],
+  "author": "BMAD AI Agent Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/usemanusai/free-deep-research.git",
+    "directory": "bmad-agent/free-deep-research"
+  },
+  "bugs": {
+    "url": "https://github.com/usemanusai/free-deep-research/issues"
+  },
+  "homepage": "https://github.com/usemanusai/free-deep-research#readme"
+}
