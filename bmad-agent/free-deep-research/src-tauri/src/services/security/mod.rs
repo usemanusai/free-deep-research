@@ -104,13 +104,13 @@ impl SecurityService {
     }
     
     /// Log an audit event
-    pub async fn log_audit_event(&self, event: AuditEvent) -> AppResult<()> {
+    pub async fn log_audit_event(&self, event: audit_logger::AuditEvent) -> AppResult<()> {
         let mut audit_logger = self.audit_logger.write().await;
         audit_logger.log_event(event).await
     }
-    
+
     /// Get audit logs
-    pub async fn get_audit_logs(&self, limit: Option<u32>) -> AppResult<Vec<AuditEvent>> {
+    pub async fn get_audit_logs(&self, limit: Option<u32>) -> AppResult<Vec<audit_logger::AuditEvent>> {
         let audit_logger = self.audit_logger.read().await;
         audit_logger.get_logs(limit).await
     }
