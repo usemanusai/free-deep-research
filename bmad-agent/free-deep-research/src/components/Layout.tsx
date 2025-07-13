@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { 
-  HomeIcon, 
-  KeyIcon, 
-  BeakerIcon, 
-  ChartBarIcon, 
+import {
+  HomeIcon,
+  KeyIcon,
+  BeakerIcon,
+  ChartBarIcon,
+  PresentationChartLineIcon,
   CogIcon,
   Bars3Icon,
   XMarkIcon
@@ -20,6 +21,7 @@ const navigation = [
   { name: 'API Keys', href: '/api-keys', icon: KeyIcon },
   { name: 'Research', href: '/research', icon: BeakerIcon },
   { name: 'Monitoring', href: '/monitoring', icon: ChartBarIcon },
+  { name: 'Analytics', href: '/analytics', icon: PresentationChartLineIcon },
   { name: 'Settings', href: '/settings', icon: CogIcon },
 ]
 

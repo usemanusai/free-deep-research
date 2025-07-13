@@ -212,7 +212,21 @@ async fn main() {
             monitoring::get_api_usage_stats,
             monitoring::get_service_health,
             monitoring::get_audit_logs,
-            
+
+            // Analytics commands
+            analytics::get_analytics_dashboard_data,
+            analytics::get_usage_analytics,
+            analytics::get_performance_metrics,
+            analytics::get_performance_trends,
+            analytics::get_predictive_analytics,
+            analytics::generate_business_report,
+            analytics::get_optimization_recommendations,
+            analytics::record_analytics_event,
+            analytics::get_analytics_config,
+            analytics::update_analytics_config,
+            analytics::export_analytics_data,
+            analytics::get_analytics_health,
+
             // Health check
             health_check
         ])
