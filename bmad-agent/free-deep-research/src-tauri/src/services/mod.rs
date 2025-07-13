@@ -8,6 +8,7 @@ pub mod template_manager;
 pub mod data_persistence;
 pub mod monitoring;
 pub mod security;
+pub mod output_processor;
 
 use crate::error::{AppError, AppResult};
 use api_manager::ApiManagerService;
@@ -16,6 +17,7 @@ use template_manager::TemplateManagerService;
 use data_persistence::DataPersistenceService;
 use monitoring::MonitoringService;
 use security::SecurityService;
+use output_processor::OutputProcessorService;
 
 /// Central service manager that coordinates all application services
 #[derive(Clone)]
@@ -26,6 +28,7 @@ pub struct ServiceManager {
     pub data_persistence: Arc<RwLock<DataPersistenceService>>,
     pub monitoring: Arc<RwLock<MonitoringService>>,
     pub security: Arc<RwLock<SecurityService>>,
+    pub output_processor: Arc<RwLock<OutputProcessorService>>,
 }
 
 impl ServiceManager {
@@ -68,6 +71,10 @@ impl ServiceManager {
         ).await?;
         let template_manager = Arc::new(RwLock::new(template_manager));
 
+        // Initialize output processor service
+        let output_processor = OutputProcessorService::new().await?;
+        let output_processor = Arc::new(RwLock::new(output_processor));
+
         let service_manager = Self {
             api_manager,
             research_engine,
@@ -75,6 +82,7 @@ impl ServiceManager {
             data_persistence,
             monitoring,
             security,
+            output_processor,
         };
         
         // Start background services
@@ -164,7 +172,16 @@ impl ServiceManager {
                 status.research_engine = ServiceStatus::Unhealthy;
             }
         }
-        
+
+        // Check output processor service
+        match self.output_processor.read().await.health_check().await {
+            Ok(_) => status.output_processor = ServiceStatus::Healthy,
+            Err(e) => {
+                error!("Output processor service health check failed: {}", e);
+                status.output_processor = ServiceStatus::Unhealthy;
+            }
+        }
+
         Ok(status)
     }
     
@@ -176,6 +193,12 @@ impl ServiceManager {
         {
             let research_engine = self.research_engine.write().await;
             research_engine.shutdown().await?;
+        }
+
+        // Stop output processor
+        {
+            let output_processor = self.output_processor.write().await;
+            output_processor.shutdown().await?;
         }
         
         // Stop API manager
@@ -215,6 +238,7 @@ pub struct ServiceHealthStatus {
     pub monitoring: ServiceStatus,
     pub api_manager: ServiceStatus,
     pub research_engine: ServiceStatus,
+    pub output_processor: ServiceStatus,
 }
 
 impl Default for ServiceHealthStatus {
@@ -225,6 +249,7 @@ impl Default for ServiceHealthStatus {
             monitoring: ServiceStatus::Unknown,
             api_manager: ServiceStatus::Unknown,
             research_engine: ServiceStatus::Unknown,
+            output_processor: ServiceStatus::Unknown,
         }
     }
 }
@@ -237,6 +262,7 @@ impl ServiceHealthStatus {
             && matches!(self.monitoring, ServiceStatus::Healthy)
             && matches!(self.api_manager, ServiceStatus::Healthy)
             && matches!(self.research_engine, ServiceStatus::Healthy)
+            && matches!(self.output_processor, ServiceStatus::Healthy)
     }
 }
 
