@@ -1,4 +1,6 @@
 pub mod api_management;
+pub mod research_workflow;
+pub mod template_management;
 pub mod research;
 pub mod config;
 pub mod monitoring;

@@ -10,6 +10,8 @@ pub enum ServiceProvider {
     SerpApi,
     Jina,
     Firecrawl,
+    Tavily,
+    Exa,
 }
 
 impl ServiceProvider {
@@ -20,9 +22,11 @@ impl ServiceProvider {
             ServiceProvider::SerpApi => "SerpApi",
             ServiceProvider::Jina => "Jina AI",
             ServiceProvider::Firecrawl => "Firecrawl",
+            ServiceProvider::Tavily => "Tavily",
+            ServiceProvider::Exa => "Exa AI",
         }
     }
-    
+
     /// Get the default rate limit for the service
     pub fn default_rate_limit(&self) -> u32 {
         match self {
@@ -30,9 +34,11 @@ impl ServiceProvider {
             ServiceProvider::SerpApi => 100,    // 100 searches/month
             ServiceProvider::Jina => 1000,      // 1000 requests/month
             ServiceProvider::Firecrawl => 500,  // 500 requests/month
+            ServiceProvider::Tavily => 1000,    // 1000 searches/month
+            ServiceProvider::Exa => 1000,       // 1000 searches/month
         }
     }
-    
+
     /// Get the reset period for the service
     pub fn reset_period(&self) -> ResetPeriod {
         match self {
@@ -40,6 +46,21 @@ impl ServiceProvider {
             ServiceProvider::SerpApi => ResetPeriod::Monthly,
             ServiceProvider::Jina => ResetPeriod::Monthly,
             ServiceProvider::Firecrawl => ResetPeriod::Monthly,
+            ServiceProvider::Tavily => ResetPeriod::Monthly,
+            ServiceProvider::Exa => ResetPeriod::Monthly,
+        }
+    }
+
+    /// Parse from string representation
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "openrouter" => Some(ServiceProvider::OpenRouter),
+            "serpapi" => Some(ServiceProvider::SerpApi),
+            "jina" => Some(ServiceProvider::Jina),
+            "firecrawl" => Some(ServiceProvider::Firecrawl),
+            "tavily" => Some(ServiceProvider::Tavily),
+            "exa" => Some(ServiceProvider::Exa),
+            _ => None,
         }
     }
 }
@@ -52,6 +73,17 @@ pub enum ResetPeriod {
     Monthly,
 }
 
+impl ResetPeriod {
+    /// Parse from string representation
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "daily" => Some(ResetPeriod::Daily),
+            "monthly" => Some(ResetPeriod::Monthly),
+            _ => None,
+        }
+    }
+}
+
 /// API key status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -60,6 +92,21 @@ pub enum ApiKeyStatus {
     Exhausted,
     Error,
     Disabled,
+    Inactive,
+}
+
+impl ApiKeyStatus {
+    /// Parse from string representation
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "active" => Some(ApiKeyStatus::Active),
+            "exhausted" => Some(ApiKeyStatus::Exhausted),
+            "error" => Some(ApiKeyStatus::Error),
+            "disabled" => Some(ApiKeyStatus::Disabled),
+            "inactive" => Some(ApiKeyStatus::Inactive),
+            _ => None,
+        }
+    }
 }
 
 /// API key model
