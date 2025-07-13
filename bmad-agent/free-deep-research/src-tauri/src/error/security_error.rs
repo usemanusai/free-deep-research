@@ -39,6 +39,9 @@ pub enum SecurityError {
     
     #[error("Key rotation failed: {message}")]
     KeyRotationFailed { message: String },
+
+    #[error("Session limit exceeded")]
+    SessionLimitExceeded,
 }
 
 impl SecurityError {
@@ -61,6 +64,11 @@ impl SecurityError {
         Self::KeyDerivationFailed {
             message: message.into(),
         }
+    }
+
+    /// Create a session limit exceeded error
+    pub fn session_limit_exceeded() -> Self {
+        Self::SessionLimitExceeded
     }
     
     /// Check if this error requires user authentication

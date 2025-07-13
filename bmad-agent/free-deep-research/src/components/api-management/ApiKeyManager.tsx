@@ -1,265 +1,318 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@tauri-apps/api/tauri'
-
-interface ApiKey {
-  id: string
-  service: string
-  name: string
-  usage_count: number
-  rate_limit: number
-  status: string
-  created_at: string
-  updated_at: string
-}
-
-interface ImportResult {
-  successful_count: number
-  failed_count: number
-  errors: string[]
-}
+import { 
+  PlusIcon, 
+  KeyIcon, 
+  TrashIcon, 
+  PencilIcon,
+  ArrowUpTrayIcon,
+  ArrowDownTrayIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  XCircleIcon,
+  ClockIcon,
+  ChartBarIcon
+} from '@heroicons/react/24/outline'
+import { 
+  ApiKey, 
+  CreateApiKeyRequest, 
+  UpdateApiKeyRequest, 
+  ImportResult,
+  ApiKeyTestResult,
+  ServiceProvider 
+} from '@/types/api'
+import LoadingSpinner from '@/components/common/LoadingSpinner'
+import ErrorAlert from '@/components/common/ErrorAlert'
 
 export default function ApiKeyManager() {
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [showAddForm, setShowAddForm] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [editingKey, setEditingKey] = useState<ApiKey | null>(null)
   const [importType, setImportType] = useState<'csv' | 'json'>('csv')
   const [importContent, setImportContent] = useState('')
-  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
 
-  // Form state for adding new API key
-  const [newKey, setNewKey] = useState({
+  // Form state for adding/editing API key
+  const [keyForm, setKeyForm] = useState<CreateApiKeyRequest>({
     service: 'openrouter',
     name: '',
     api_key: '',
-    rate_limit: ''
+    rate_limit: 50
   })
 
-  useEffect(() => {
-    loadApiKeys()
-  }, [])
+  // Fetch API keys with real-time updates
+  const { data: apiKeys, isLoading, error, refetch } = useQuery({
+    queryKey: ['api-keys'],
+    queryFn: () => invoke<ApiKey[]>('get_api_keys'),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  })
 
-  const loadApiKeys = async () => {
-    try {
-      setLoading(true)
-      const keys = await invoke<ApiKey[]>('get_api_keys')
-      setApiKeys(keys)
-    } catch (error) {
-      console.error('Failed to load API keys:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleAddKey = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const request = {
-        service: newKey.service,
-        name: newKey.name,
-        api_key: newKey.api_key,
-        rate_limit: newKey.rate_limit ? parseInt(newKey.rate_limit) : null
-      }
-
-      await invoke('add_api_key', { request })
-      setNewKey({ service: 'openrouter', name: '', api_key: '', rate_limit: '' })
+  // Mutations for API key operations
+  const addKeyMutation = useMutation({
+    mutationFn: (newKey: CreateApiKeyRequest) => invoke('add_api_key', newKey),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['api-keys'] })
       setShowAddForm(false)
-      loadApiKeys()
-    } catch (error) {
-      console.error('Failed to add API key:', error)
-      alert('Failed to add API key: ' + error)
-    }
-  }
+      resetForm()
+    },
+  })
 
-  const handleDeleteKey = async (keyId: string) => {
-    if (!confirm('Are you sure you want to delete this API key?')) return
+  const updateKeyMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: UpdateApiKeyRequest }) => 
+      invoke('update_api_key', { keyId: id, updates }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['api-keys'] })
+      setEditingKey(null)
+      resetForm()
+    },
+  })
 
-    try {
-      await invoke('delete_api_key', { keyId })
-      loadApiKeys()
-    } catch (error) {
-      console.error('Failed to delete API key:', error)
-      alert('Failed to delete API key: ' + error)
-    }
-  }
+  const deleteKeyMutation = useMutation({
+    mutationFn: (keyId: string) => invoke('delete_api_key', { keyId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['api-keys'] })
+    },
+  })
 
-  const handleTestKey = async (keyId: string) => {
-    const startTime = Date.now()
+  const testKeyMutation = useMutation({
+    mutationFn: (keyId: string) => invoke<ApiKeyTestResult>('test_api_key', { keyId }),
+  })
 
-    try {
-      // Check if request can be made first
-      const canMake = await invoke<boolean>('can_make_request', { keyId })
-      if (!canMake) {
-        alert('Request blocked by rate limiter. Check rate limit dashboard for details.')
-        return
-      }
-
-      const result = await invoke('test_api_key', { keyId })
-      const responseTime = Date.now() - startTime
-
-      // Record the API request and performance
-      await Promise.all([
-        invoke('record_api_request', { keyId, success: true }),
-        invoke('record_key_performance', { keyId, success: true, responseTimeMs: responseTime })
-      ])
-
-      alert(JSON.stringify(result, null, 2))
-    } catch (error) {
-      console.error('Failed to test API key:', error)
-      const responseTime = Date.now() - startTime
-
-      // Record failed request and performance
-      try {
-        await Promise.all([
-          invoke('record_api_request', { keyId, success: false }),
-          invoke('record_key_performance', { keyId, success: false, responseTimeMs: responseTime })
-        ])
-      } catch (recordError) {
-        console.error('Failed to record failed request:', recordError)
-      }
-
-      alert('Failed to test API key: ' + error)
-    }
-  }
-
-  const handleImport = async () => {
-    try {
-      let result: ImportResult
-
-      if (importType === 'csv') {
-        result = await invoke<ImportResult>('import_api_keys_csv', { csvContent: importContent })
+  const importKeysMutation = useMutation({
+    mutationFn: ({ content, type }: { content: string; type: 'csv' | 'json' }) => {
+      if (type === 'csv') {
+        return invoke<ImportResult>('import_api_keys_csv', { csvContent: content })
       } else {
-        result = await invoke<ImportResult>('import_api_keys_json', { jsonContent: importContent })
+        return invoke<ImportResult>('import_api_keys_json', { jsonContent: content })
       }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['api-keys'] })
+      setShowImportModal(false)
+      setImportContent('')
+    },
+  })
 
-      setImportResult(result)
-      if (result.successful_count > 0) {
-        loadApiKeys()
+  const resetForm = () => {
+    setKeyForm({
+      service: 'openrouter',
+      name: '',
+      api_key: '',
+      rate_limit: 50
+    })
+  }
+
+  const handleAddKey = () => {
+    addKeyMutation.mutate(keyForm)
+  }
+
+  const handleUpdateKey = () => {
+    if (!editingKey) return
+    updateKeyMutation.mutate({
+      id: editingKey.id,
+      updates: {
+        name: keyForm.name,
+        rate_limit: keyForm.rate_limit,
       }
-    } catch (error) {
-      console.error('Failed to import API keys:', error)
-      alert('Failed to import API keys: ' + error)
+    })
+  }
+
+  const handleDeleteKey = (keyId: string) => {
+    if (confirm('Are you sure you want to delete this API key?')) {
+      deleteKeyMutation.mutate(keyId)
     }
   }
 
-  const handleExport = async (format: 'csv' | 'json') => {
-    try {
-      let content: string
-      let filename: string
+  const handleTestKey = (keyId: string) => {
+    testKeyMutation.mutate(keyId)
+  }
 
-      if (format === 'csv') {
-        content = await invoke<string>('export_api_keys_csv')
-        filename = 'api_keys.csv'
-      } else {
-        content = await invoke<string>('export_api_keys_json')
-        filename = 'api_keys.json'
-      }
+  const handleImport = () => {
+    importKeysMutation.mutate({ content: importContent, type: importType })
+  }
 
-      // Create download link
-      const blob = new Blob([content], { type: format === 'csv' ? 'text/csv' : 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Failed to export API keys:', error)
-      alert('Failed to export API keys: ' + error)
+  const handleEditKey = (key: ApiKey) => {
+    setEditingKey(key)
+    setKeyForm({
+      service: key.service,
+      name: key.name,
+      api_key: '', // Don't populate encrypted key
+      rate_limit: key.rate_limit
+    })
+    setShowAddForm(true)
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <CheckCircleIcon className="h-5 w-5 text-green-500" />
+      case 'exhausted':
+        return <ClockIcon className="h-5 w-5 text-yellow-500" />
+      case 'error':
+        return <XCircleIcon className="h-5 w-5 text-red-500" />
+      case 'rate_limited':
+        return <ExclamationTriangleIcon className="h-5 w-5 text-orange-500" />
+      default:
+        return <XCircleIcon className="h-5 w-5 text-gray-500" />
     }
   }
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active': return 'text-green-600 bg-green-100'
-      case 'exhausted': return 'text-yellow-600 bg-yellow-100'
-      case 'error': return 'text-red-600 bg-red-100'
-      case 'disabled': return 'text-gray-600 bg-gray-100'
-      default: return 'text-gray-600 bg-gray-100'
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800'
+      case 'exhausted':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'error':
+        return 'bg-red-100 text-red-800'
+      case 'rate_limited':
+        return 'bg-orange-100 text-orange-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const getUsagePercentage = (usage: number, limit: number) => {
-    return limit > 0 ? (usage / limit) * 100 : 0
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <LoadingSpinner size="lg" message="Loading API keys..." />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <ErrorAlert 
+        title="Failed to Load API Keys"
+        message="Unable to fetch API keys. Please try again."
+        onRetry={refetch}
+      />
+    )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">API Key Management</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage your API keys for external services
+            Manage your service API keys with real-time monitoring and intelligent rotation
           </p>
         </div>
-
-        <div className="flex space-x-3">
-          <a
-            href="/rate-limit-dashboard"
-            className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 inline-flex items-center"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            Rate Limits
-          </a>
-          <a
-            href="/key-rotation-dashboard"
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 inline-flex items-center"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Key Rotation
-          </a>
+        <div className="flex items-center space-x-3">
           <button
             onClick={() => setShowImportModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
-            Import Keys
+            <ArrowUpTrayIcon className="h-4 w-4 mr-2" />
+            Import
           </button>
-          <div className="relative">
-            <button className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
-              Export Keys
-            </button>
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden group-hover:block">
-              <button
-                onClick={() => handleExport('csv')}
-                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              >
-                Export as CSV
-              </button>
-              <button
-                onClick={() => handleExport('json')}
-                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              >
-                Export as JSON
-              </button>
-            </div>
-          </div>
           <button
             onClick={() => setShowAddForm(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
+            <PlusIcon className="h-4 w-4 mr-2" />
             Add API Key
           </button>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <KeyIcon className="h-6 w-6 text-gray-400" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Total Keys</dt>
+                  <dd className="text-lg font-medium text-gray-900">{apiKeys?.length || 0}</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <CheckCircleIcon className="h-6 w-6 text-green-400" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Active</dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {apiKeys?.filter(key => key.status === 'active').length || 0}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <ExclamationTriangleIcon className="h-6 w-6 text-yellow-400" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Rate Limited</dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {apiKeys?.filter(key => key.status === 'rate_limited' || key.status === 'exhausted').length || 0}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <ChartBarIcon className="h-6 w-6 text-blue-400" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Total Usage</dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {apiKeys?.reduce((sum, key) => sum + key.usage_count, 0) || 0}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* API Keys Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">API Keys ({apiKeys.length})</h3>
+          <h3 className="text-lg font-medium text-gray-900">API Keys ({apiKeys?.length || 0})</h3>
         </div>
 
-        {loading ? (
+        {!apiKeys || apiKeys.length === 0 ? (
           <div className="p-6 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-2 text-gray-500">Loading API keys...</p>
-          </div>
-        ) : apiKeys.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-gray-500">No API keys found. Add your first API key to get started.</p>
+            <KeyIcon className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No API keys</h3>
+            <p className="mt-1 text-sm text-gray-500">Get started by adding your first API key.</p>
+            <div className="mt-6">
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              >
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add API Key
+              </button>
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -279,7 +332,7 @@ export default function ApiKeyManager() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created
+                    Last Used
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -288,9 +341,9 @@ export default function ApiKeyManager() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {apiKeys.map((key) => {
-                  const usagePercentage = getUsagePercentage(key.usage_count, key.rate_limit)
+                  const usagePercentage = key.rate_limit > 0 ? (key.usage_count / key.rate_limit) * 100 : 0
                   return (
-                    <tr key={key.id}>
+                    <tr key={key.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="text-sm font-medium text-gray-900 capitalize">
@@ -307,35 +360,48 @@ export default function ApiKeyManager() {
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                           <div
-                            className={`h-2 rounded-full ${
+                            className={`h-2 rounded-full transition-all duration-300 ${
                               usagePercentage >= 90 ? 'bg-red-500' :
                               usagePercentage >= 70 ? 'bg-yellow-500' : 'bg-green-500'
                             }`}
                             style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-                          ></div>
+                          />
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(key.status)}`}>
-                          {key.status}
-                        </span>
+                        <div className="flex items-center">
+                          {getStatusIcon(key.status)}
+                          <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(key.status)}`}>
+                            {key.status}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(key.created_at).toLocaleDateString()}
+                        {key.last_used ? new Date(key.last_used).toLocaleDateString() : 'Never'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleTestKey(key.id)}
-                          className="text-indigo-600 hover:text-indigo-900 mr-3"
-                        >
-                          Test
-                        </button>
-                        <button
-                          onClick={() => handleDeleteKey(key.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => handleTestKey(key.id)}
+                            disabled={testKeyMutation.isPending}
+                            className="text-primary-600 hover:text-primary-900 disabled:text-gray-400"
+                          >
+                            {testKeyMutation.isPending ? 'Testing...' : 'Test'}
+                          </button>
+                          <button
+                            onClick={() => handleEditKey(key)}
+                            className="text-gray-600 hover:text-gray-900"
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteKey(key.id)}
+                            disabled={deleteKeyMutation.isPending}
+                            className="text-red-600 hover:text-red-900 disabled:text-gray-400"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -346,27 +412,31 @@ export default function ApiKeyManager() {
         )}
       </div>
 
-      {/* Add API Key Modal */}
+      {/* Add/Edit API Key Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Add New API Key</h3>
-              <form onSubmit={handleAddKey} className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {editingKey ? 'Edit API Key' : 'Add New API Key'}
+              </h3>
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                editingKey ? handleUpdateKey() : handleAddKey()
+              }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Service</label>
                   <select
-                    value={newKey.service}
-                    onChange={(e) => setNewKey({ ...newKey, service: e.target.value })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    value={keyForm.service}
+                    onChange={(e) => setKeyForm({ ...keyForm, service: e.target.value as ServiceProvider })}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     required
+                    disabled={!!editingKey}
                   >
                     <option value="openrouter">OpenRouter</option>
                     <option value="serpapi">SerpAPI</option>
                     <option value="jina">Jina AI</option>
                     <option value="firecrawl">Firecrawl</option>
-                    <option value="tavily">Tavily</option>
-                    <option value="exa">Exa AI</option>
                   </select>
                 </div>
 
@@ -374,50 +444,59 @@ export default function ApiKeyManager() {
                   <label className="block text-sm font-medium text-gray-700">Name</label>
                   <input
                     type="text"
-                    value={newKey.name}
-                    onChange={(e) => setNewKey({ ...newKey, name: e.target.value })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    value={keyForm.name}
+                    onChange={(e) => setKeyForm({ ...keyForm, name: e.target.value })}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="e.g., Primary OpenRouter Key"
                     required
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">API Key</label>
-                  <input
-                    type="password"
-                    value={newKey.api_key}
-                    onChange={(e) => setNewKey({ ...newKey, api_key: e.target.value })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    placeholder="Enter your API key"
-                    required
-                  />
-                </div>
+                {!editingKey && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">API Key</label>
+                    <input
+                      type="password"
+                      value={keyForm.api_key}
+                      onChange={(e) => setKeyForm({ ...keyForm, api_key: e.target.value })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Enter your API key"
+                      required
+                    />
+                  </div>
+                )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Rate Limit (optional)</label>
+                  <label className="block text-sm font-medium text-gray-700">Rate Limit</label>
                   <input
                     type="number"
-                    value={newKey.rate_limit}
-                    onChange={(e) => setNewKey({ ...newKey, rate_limit: e.target.value })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    placeholder="Leave empty for default"
+                    value={keyForm.rate_limit}
+                    onChange={(e) => setKeyForm({ ...keyForm, rate_limit: parseInt(e.target.value) || 0 })}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="50"
+                    min="1"
                   />
                 </div>
 
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setShowAddForm(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                    onClick={() => {
+                      setShowAddForm(false)
+                      setEditingKey(null)
+                      resetForm()
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                    disabled={addKeyMutation.isPending || updateKeyMutation.isPending}
+                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-gray-400"
                   >
-                    Add Key
+                    {addKeyMutation.isPending || updateKeyMutation.isPending ? 'Saving...' :
+                     editingKey ? 'Update Key' : 'Add Key'}
                   </button>
                 </div>
               </form>
@@ -439,7 +518,7 @@ export default function ApiKeyManager() {
                   <select
                     value={importType}
                     onChange={(e) => setImportType(e.target.value as 'csv' | 'json')}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="csv">CSV</option>
                     <option value="json">JSON</option>
@@ -453,7 +532,7 @@ export default function ApiKeyManager() {
                   <textarea
                     value={importContent}
                     onChange={(e) => setImportContent(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 h-32"
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 h-32 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder={
                       importType === 'csv'
                         ? 'service,name,key,rate_limit\nopenrouter,Primary Key,sk-...,50'
@@ -462,45 +541,23 @@ export default function ApiKeyManager() {
                   />
                 </div>
 
-                {importResult && (
-                  <div className="p-3 bg-gray-50 rounded-md">
-                    <p className="text-sm">
-                      <span className="text-green-600">Success: {importResult.successful_count}</span>
-                      {importResult.failed_count > 0 && (
-                        <span className="text-red-600 ml-2">Failed: {importResult.failed_count}</span>
-                      )}
-                    </p>
-                    {importResult.errors.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-sm font-medium text-red-600">Errors:</p>
-                        <ul className="text-xs text-red-500 mt-1">
-                          {importResult.errors.map((error, index) => (
-                            <li key={index}>• {error}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
                     onClick={() => {
                       setShowImportModal(false)
                       setImportContent('')
-                      setImportResult(null)
                     }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleImport}
-                    disabled={!importContent.trim()}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                    disabled={!importContent.trim() || importKeysMutation.isPending}
+                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-gray-400"
                   >
-                    Import
+                    {importKeysMutation.isPending ? 'Importing...' : 'Import'}
                   </button>
                 </div>
               </div>

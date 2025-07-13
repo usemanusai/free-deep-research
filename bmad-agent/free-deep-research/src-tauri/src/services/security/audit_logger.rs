@@ -1,11 +1,16 @@
 use std::sync::Arc;
 use std::path::PathBuf;
+use std::collections::HashMap;
 use tokio::sync::RwLock;
-use tracing::{info, debug, error};
+use tokio::time::{interval, Duration};
+use tracing::{info, debug, error, warn};
 use rusqlite::{Connection, params};
-use chrono::Utc;
+use chrono::{Utc, DateTime};
 use dirs;
 use serde_json;
+use ring::{hmac, digest};
+use uuid::Uuid;
+use serde::{Serialize, Deserialize};
 
 use crate::error::{AppResult, StorageError};
 use crate::services::security::EncryptionManager;
@@ -15,17 +20,67 @@ use crate::utils::file_utils::ensure_dir_exists;
 // Type alias for compatibility
 pub type AuditEvent = SecurityAuditEntry;
 
-/// Audit logger for tracking security-related events
+/// Enhanced audit logger for tracking security-related events with tamper-proof features
 pub struct AuditLogger {
     encryption_manager: Arc<RwLock<EncryptionManager>>,
     db_path: PathBuf,
     connection: Option<Connection>,
+    integrity_key: Option<hmac::Key>,
+    compliance_config: ComplianceConfiguration,
+    log_chain: Vec<String>, // Chain of log hashes for tamper detection
+    retention_manager: Option<tokio::task::JoinHandle<()>>,
+}
+
+/// Compliance configuration for audit logging
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComplianceConfiguration {
+    pub retention_days: u32,
+    pub tamper_proof_enabled: bool,
+    pub real_time_monitoring: bool,
+    pub compliance_reporting: bool,
+    pub log_encryption_enabled: bool,
+    pub chain_verification_enabled: bool,
+    pub export_format: String,
+    pub alert_on_violations: bool,
+}
+
+impl Default for ComplianceConfiguration {
+    fn default() -> Self {
+        Self {
+            retention_days: 365, // 1 year retention
+            tamper_proof_enabled: true,
+            real_time_monitoring: true,
+            compliance_reporting: true,
+            log_encryption_enabled: true,
+            chain_verification_enabled: true,
+            export_format: "json".to_string(),
+            alert_on_violations: true,
+        }
+    }
+}
+
+/// Enhanced audit event with tamper-proof features
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TamperProofAuditEvent {
+    pub base_event: SecurityAuditEntry,
+    pub signature: String,
+    pub previous_hash: Option<String>,
+    pub chain_index: u64,
+    pub compliance_tags: Vec<String>,
 }
 
 impl AuditLogger {
-    /// Create a new audit logger
+    /// Create a new enhanced audit logger with tamper-proof features
     pub async fn new(encryption_manager: Arc<RwLock<EncryptionManager>>) -> AppResult<Self> {
-        info!("Initializing audit logger...");
+        Self::new_with_config(encryption_manager, ComplianceConfiguration::default()).await
+    }
+
+    /// Create a new audit logger with custom compliance configuration
+    pub async fn new_with_config(
+        encryption_manager: Arc<RwLock<EncryptionManager>>,
+        compliance_config: ComplianceConfiguration,
+    ) -> AppResult<Self> {
+        info!("Initializing enhanced audit logger with tamper-proof features...");
 
         // Determine database path
         let mut db_path = dirs::data_dir()
@@ -35,17 +90,112 @@ impl AuditLogger {
         ensure_dir_exists(&db_path)?;
         db_path.push("audit_log.db");
 
+        // Generate integrity key for tamper-proof logging
+        let integrity_key = if compliance_config.tamper_proof_enabled {
+            let key_material = ring::rand::SystemRandom::new();
+            let mut key_bytes = [0u8; 32];
+            ring::rand::SecureRandom::fill(&key_material, &mut key_bytes)
+                .map_err(|_| StorageError::Database { message: "Failed to generate integrity key".to_string() })?;
+            Some(hmac::Key::new(hmac::HMAC_SHA256, &key_bytes))
+        } else {
+            None
+        };
+
         let mut logger = Self {
             encryption_manager,
             db_path,
             connection: None,
+            integrity_key,
+            compliance_config,
+            log_chain: Vec::new(),
+            retention_manager: None,
         };
 
         // Initialize database
         logger.initialize_database().await?;
 
-        info!("Audit logger initialized successfully");
+        // Initialize log chain
+        logger.initialize_log_chain().await?;
+
+        // Start retention manager if needed
+        if logger.compliance_config.retention_days > 0 {
+            logger.start_retention_manager().await?;
+        }
+
+        info!("Enhanced audit logger initialized successfully");
         Ok(logger)
+    }
+
+    /// Initialize the log chain for tamper detection
+    async fn initialize_log_chain(&mut self) -> AppResult<()> {
+        if !self.compliance_config.chain_verification_enabled {
+            return Ok(());
+        }
+
+        debug!("Initializing audit log chain");
+
+        // Get the last few log entries to rebuild the chain
+        let recent_logs = self.get_logs(Some(100)).await?;
+
+        for log in recent_logs.iter().rev() {
+            let log_hash = self.calculate_log_hash(&log).await?;
+            self.log_chain.push(log_hash);
+        }
+
+        // Limit chain size to prevent memory issues
+        if self.log_chain.len() > 1000 {
+            self.log_chain.drain(0..self.log_chain.len() - 1000);
+        }
+
+        info!("Log chain initialized with {} entries", self.log_chain.len());
+        Ok(())
+    }
+
+    /// Start the retention manager for automatic log cleanup
+    async fn start_retention_manager(&mut self) -> AppResult<()> {
+        if self.retention_manager.is_some() {
+            return Ok(()); // Already running
+        }
+
+        let retention_days = self.compliance_config.retention_days;
+        let db_path = self.db_path.clone();
+
+        let handle = tokio::spawn(async move {
+            let mut interval_timer = interval(Duration::from_secs(24 * 60 * 60)); // Daily cleanup
+
+            loop {
+                interval_timer.tick().await;
+
+                if let Err(e) = Self::cleanup_old_logs(&db_path, retention_days).await {
+                    error!("Failed to cleanup old audit logs: {}", e);
+                }
+            }
+        });
+
+        self.retention_manager = Some(handle);
+        info!("Retention manager started with {} days retention", retention_days);
+        Ok(())
+    }
+
+    /// Cleanup old audit logs based on retention policy
+    async fn cleanup_old_logs(db_path: &Path, retention_days: u32) -> AppResult<()> {
+        debug!("Cleaning up audit logs older than {} days", retention_days);
+
+        let conn = Connection::open(db_path)
+            .map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+        let cutoff_date = Utc::now() - chrono::Duration::days(retention_days as i64);
+
+        let deleted_count = conn.execute(
+            "DELETE FROM audit_events WHERE timestamp < ?1",
+            params![cutoff_date.to_rfc3339()],
+        ).map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+        if deleted_count > 0 {
+            info!("Cleaned up {} old audit log entries", deleted_count);
+        }
+
+        Ok(())
     }
 
     /// Initialize the database schema
