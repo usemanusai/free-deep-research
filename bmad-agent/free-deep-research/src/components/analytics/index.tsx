@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import UsageAnalytics from './UsageAnalytics';
 import PerformanceMonitor from './PerformanceMonitor';
