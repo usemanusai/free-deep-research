@@ -85,7 +85,19 @@
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
-        "timestampUrl": ""
+        "timestampUrl": "",
+        "allowDowngrades": true,
+        "wix": {
+          "language": "en-US",
+          "template": "main.wxs"
+        },
+        "nsis": {
+          "displayLanguageSelector": true,
+          "languages": ["English"],
+          "installerIcon": "icons/icon.ico",
+          "installMode": "perMachine",
+          "allowDowngrades": true
+        }
       }
     },
     "security": {
