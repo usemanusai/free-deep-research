@@ -127,11 +127,11 @@
 - [x] Set up template marketplace for community sharing
 
 ### Story 3.3: Research Queue Management
-- [ ] Implement research queue with priority scheduling
-- [ ] Create concurrent execution with configurable parallelism
-- [ ] Build queue monitoring with progress tracking
-- [ ] Implement queue management (pause, resume, cancel)
-- [ ] Create resource allocation and limit management
+- [x] Implement research queue with priority scheduling
+- [x] Create concurrent execution with configurable parallelism
+- [x] Build queue monitoring with progress tracking
+- [x] Implement queue management (pause, resume, cancel)
+- [x] Create resource allocation and limit management
 - [ ] Set up queue persistence and recovery
 - [ ] Implement queue analytics and optimization
 - [ ] Build queue scheduling with time-based execution
@@ -139,10 +139,10 @@
 - [ ] Implement queue backup and restore functionality
 
 ### Story 3.4: Output Processing and Formatting
-- [ ] Create output formatting engine for multiple formats (markdown, PDF, HTML, JSON)
-- [ ] Implement result visualization with charts and graphs
-- [ ] Build export functionality with customizable templates
-- [ ] Create result comparison and analysis tools
+- [x] Create output formatting engine for multiple formats (markdown, PDF, HTML, JSON)
+- [x] Implement result visualization with charts and graphs
+- [x] Build export functionality with customizable templates
+- [x] Create result comparison and analysis tools
 - [ ] Implement integration capabilities for external tools
 - [ ] Set up result storage and organization
 - [ ] Create result search and filtering capabilities

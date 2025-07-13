@@ -76,6 +76,15 @@ impl ResearchError {
             message: message.into(),
         }
     }
+
+    /// Create a new resource limit exceeded error
+    pub fn resource_limit_exceeded(message: impl Into<String>) -> Self {
+        Self::ResourceLimitExceeded {
+            resource: "general".to_string(),
+            current: 0,
+            limit: 0,
+        }
+    }
     
     /// Check if this error is retryable
     pub fn is_retryable(&self) -> bool {

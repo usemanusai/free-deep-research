@@ -4,6 +4,7 @@ pub mod template_management;
 pub mod research;
 pub mod config;
 pub mod monitoring;
+pub mod output_processor;
 
 pub use api_management::*;
 pub use research::*;
