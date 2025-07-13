@@ -9,6 +9,7 @@ pub mod data_persistence;
 pub mod monitoring;
 pub mod security;
 pub mod output_processor;
+pub mod analytics;
 
 use crate::error::{AppError, AppResult};
 use api_manager::ApiManagerService;
@@ -18,6 +19,7 @@ use data_persistence::DataPersistenceService;
 use monitoring::MonitoringService;
 use security::SecurityService;
 use output_processor::OutputProcessorService;
+use analytics::AnalyticsService;
 
 /// Central service manager that coordinates all application services
 #[derive(Clone)]
@@ -29,6 +31,7 @@ pub struct ServiceManager {
     pub monitoring: Arc<RwLock<MonitoringService>>,
     pub security: Arc<RwLock<SecurityService>>,
     pub output_processor: Arc<RwLock<OutputProcessorService>>,
+    pub analytics: Arc<RwLock<AnalyticsService>>,
 }
 
 impl ServiceManager {
@@ -75,6 +78,13 @@ impl ServiceManager {
         let output_processor = OutputProcessorService::new().await?;
         let output_processor = Arc::new(RwLock::new(output_processor));
 
+        // Initialize analytics service
+        let analytics = AnalyticsService::new(
+            data_persistence.clone(),
+            monitoring.clone(),
+        ).await?;
+        let analytics = Arc::new(RwLock::new(analytics));
+
         let service_manager = Self {
             api_manager,
             research_engine,
@@ -83,6 +93,7 @@ impl ServiceManager {
             monitoring,
             security,
             output_processor,
+            analytics,
         };
         
         // Start background services
@@ -118,6 +129,12 @@ impl ServiceManager {
         {
             let template_manager = self.template_manager.read().await;
             template_manager.start_background_monitoring().await?;
+        }
+
+        // Start analytics service processing
+        {
+            let analytics = self.analytics.read().await;
+            analytics.start_analytics_processing().await?;
         }
 
         info!("Background services started successfully");
@@ -182,6 +199,15 @@ impl ServiceManager {
             }
         }
 
+        // Check analytics service
+        match self.analytics.read().await.health_check().await {
+            Ok(_) => status.analytics = ServiceStatus::Healthy,
+            Err(e) => {
+                error!("Analytics service health check failed: {}", e);
+                status.analytics = ServiceStatus::Unhealthy;
+            }
+        }
+
         Ok(status)
     }
     
@@ -200,7 +226,13 @@ impl ServiceManager {
             let output_processor = self.output_processor.write().await;
             output_processor.shutdown().await?;
         }
-        
+
+        // Stop analytics service
+        {
+            let analytics = self.analytics.write().await;
+            analytics.shutdown().await?;
+        }
+
         // Stop API manager
         {
             let api_manager = self.api_manager.write().await;
@@ -239,6 +271,7 @@ pub struct ServiceHealthStatus {
     pub api_manager: ServiceStatus,
     pub research_engine: ServiceStatus,
     pub output_processor: ServiceStatus,
+    pub analytics: ServiceStatus,
 }
 
 impl Default for ServiceHealthStatus {
@@ -250,6 +283,7 @@ impl Default for ServiceHealthStatus {
             api_manager: ServiceStatus::Unknown,
             research_engine: ServiceStatus::Unknown,
             output_processor: ServiceStatus::Unknown,
+            analytics: ServiceStatus::Unknown,
         }
     }
 }
@@ -263,6 +297,7 @@ impl ServiceHealthStatus {
             && matches!(self.api_manager, ServiceStatus::Healthy)
             && matches!(self.research_engine, ServiceStatus::Healthy)
             && matches!(self.output_processor, ServiceStatus::Healthy)
+            && matches!(self.analytics, ServiceStatus::Healthy)
     }
 }
 

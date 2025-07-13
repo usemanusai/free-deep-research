@@ -5,8 +5,10 @@ pub mod research;
 pub mod config;
 pub mod monitoring;
 pub mod output_processor;
+pub mod analytics;
 
 pub use api_management::*;
 pub use research::*;
 pub use config::*;
 pub use monitoring::*;
+pub use analytics::*;

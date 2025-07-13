@@ -13,6 +13,7 @@ import Dashboard from '@components/dashboard/ExecutiveDashboard'
 import ApiKeyManager from '@components/api-management/ApiKeyManager'
 import ResearchWorkflow from '@components/research/ResearchWorkflow'
 import MonitoringConsole from '@components/monitoring/RealTimeConsole'
+import Analytics from '@components/analytics'
 import Settings from '@components/settings/ConfigurationPanel'
 
 // Hooks
@@ -102,6 +103,7 @@ function App() {
               <Route path="/api-keys" element={<ApiKeyManager />} />
               <Route path="/research" element={<ResearchWorkflow />} />
               <Route path="/monitoring" element={<MonitoringConsole />} />
+              <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
