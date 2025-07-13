@@ -16,6 +16,10 @@ use crate::models::research_workflow::{
 pub mod workflow_orchestrator;
 pub mod queue_manager;
 pub mod result_processor;
+pub mod workflow_engine;
+pub mod methodology_don_lim;
+pub mod methodology_nick_scamara;
+pub mod methodology_hybrid;
 
 /// Research Engine Service that orchestrates research workflows
 pub struct ResearchEngineService {
@@ -24,6 +28,7 @@ pub struct ResearchEngineService {
     monitoring: Arc<RwLock<MonitoringService>>,
     active_workflows: Arc<RwLock<HashMap<Uuid, ResearchWorkflow>>>,
     methodologies: Arc<RwLock<HashMap<String, ResearchMethodology>>>,
+    workflow_engine: Arc<workflow_engine::WorkflowEngine>,
 }
 
 impl ResearchEngineService {
@@ -35,12 +40,19 @@ impl ResearchEngineService {
     ) -> AppResult<Self> {
         info!("Initializing research engine service...");
 
+        // Create workflow engine
+        let workflow_engine = Arc::new(workflow_engine::WorkflowEngine::new(
+            data_persistence.clone(),
+            api_manager.clone(),
+        ).await?);
+
         let service = Self {
             api_manager,
             data_persistence,
             monitoring,
             active_workflows: Arc::new(RwLock::new(HashMap::new())),
             methodologies: Arc::new(RwLock::new(HashMap::new())),
+            workflow_engine,
         };
 
         // Initialize default methodologies
@@ -270,10 +282,45 @@ impl Service for ResearchEngineService {
         debug!("Performing research engine health check");
         
         // TODO: Implement actual health check
-        
+
         Ok(())
     }
-    
+
+    /// Start a workflow using the workflow engine
+    pub async fn start_workflow_execution(&self, workflow_id: Uuid) -> AppResult<()> {
+        info!("Starting workflow execution via workflow engine: {}", workflow_id);
+        self.workflow_engine.start_workflow(workflow_id).await
+    }
+
+    /// Pause a workflow
+    pub async fn pause_workflow_execution(&self, workflow_id: Uuid) -> AppResult<()> {
+        info!("Pausing workflow execution: {}", workflow_id);
+        self.workflow_engine.pause_workflow(workflow_id).await
+    }
+
+    /// Resume a workflow
+    pub async fn resume_workflow_execution(&self, workflow_id: Uuid) -> AppResult<()> {
+        info!("Resuming workflow execution: {}", workflow_id);
+        self.workflow_engine.resume_workflow(workflow_id).await
+    }
+
+    /// Cancel a workflow
+    pub async fn cancel_workflow_execution(&self, workflow_id: Uuid) -> AppResult<()> {
+        info!("Cancelling workflow execution: {}", workflow_id);
+        self.workflow_engine.cancel_workflow(workflow_id).await
+    }
+
+    /// Start background monitoring
+    pub async fn start_background_monitoring(&self) -> AppResult<()> {
+        info!("Starting research engine background monitoring...");
+
+        // Start workflow engine monitoring
+        self.workflow_engine.start_background_monitoring().await?;
+
+        info!("Research engine background monitoring started successfully");
+        Ok(())
+    }
+
     async fn shutdown(&self) -> AppResult<()> {
         info!("Shutting down research engine service...");
         

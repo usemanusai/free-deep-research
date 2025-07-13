@@ -4,6 +4,7 @@ use tracing::{info, error};
 
 pub mod api_manager;
 pub mod research_engine;
+pub mod template_manager;
 pub mod data_persistence;
 pub mod monitoring;
 pub mod security;
@@ -11,6 +12,7 @@ pub mod security;
 use crate::error::{AppError, AppResult};
 use api_manager::ApiManagerService;
 use research_engine::ResearchEngineService;
+use template_manager::TemplateManagerService;
 use data_persistence::DataPersistenceService;
 use monitoring::MonitoringService;
 use security::SecurityService;
@@ -20,6 +22,7 @@ use security::SecurityService;
 pub struct ServiceManager {
     pub api_manager: Arc<RwLock<ApiManagerService>>,
     pub research_engine: Arc<RwLock<ResearchEngineService>>,
+    pub template_manager: Arc<RwLock<TemplateManagerService>>,
     pub data_persistence: Arc<RwLock<DataPersistenceService>>,
     pub monitoring: Arc<RwLock<MonitoringService>>,
     pub security: Arc<RwLock<SecurityService>>,
@@ -57,10 +60,18 @@ impl ServiceManager {
             monitoring.clone(),
         ).await?;
         let research_engine = Arc::new(RwLock::new(research_engine));
-        
+
+        // Initialize template manager service
+        let template_manager = TemplateManagerService::new(
+            data_persistence.clone(),
+            research_engine.clone(),
+        ).await?;
+        let template_manager = Arc::new(RwLock::new(template_manager));
+
         let service_manager = Self {
             api_manager,
             research_engine,
+            template_manager,
             data_persistence,
             monitoring,
             security,
@@ -94,7 +105,13 @@ impl ServiceManager {
             let data_persistence = self.data_persistence.read().await;
             data_persistence.start_background_tasks().await?;
         }
-        
+
+        // Start template manager background monitoring
+        {
+            let template_manager = self.template_manager.read().await;
+            template_manager.start_background_monitoring().await?;
+        }
+
         info!("Background services started successfully");
         Ok(())
     }

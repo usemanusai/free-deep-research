@@ -48,6 +48,12 @@ url = "2.5"
 
 # Database and storage
 rusqlite = { version = "0.30", features = ["bundled", "chrono"] }
+csv = "1.3"
+rand = "0.8"
+async-trait = "0.1"
+url = "2.4"
+urlencoding = "2.1"
+regex = "1.10"
 
 # Cryptography and security
 ring = "0.17"
