@@ -1,0 +1,50 @@
+{
+  "name": "deep-research-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@dhiwise/component-tagger": "^1.0.10",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@reduxjs/toolkit": "^2.6.1",
+    "axios": "^1.8.4",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "d3": "^7.9.0",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.0.1",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.484.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.2.3",
+    "react-helmet": "^6.1.0",
+    "react-hook-form": "^7.55.0",
+    "react-router-dom": "^6.0.2",
+    "react-router-hash-link": "^2.4.3",
+    "recharts": "^2.15.2",
+    "redux": "^5.0.1",
+    "tailwind-merge": "^2.0.0",
+    "tailwindcss-animate": "^1.0.7",
+    "vite-tsconfig-paths": "^5.1.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.7",
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.14",
+    "eslint": "^8.45.0",
+    "eslint-plugin-react": "^7.32.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3",
+    "postcss": "^8.4.27",
+    "tailwindcss": "^3.3.3",
+    "vite": "^4.4.5"
+  }
+}
