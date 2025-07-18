@@ -1,0 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Core Colors */
+    --color-background: #1A1A1A; /* deep-charcoal */
+    --color-foreground: #F9FAFB; /* gray-50 */
+    --color-border: rgba(255, 255, 255, 0.1); /* white-10 */
+    --color-input: #2A2A2A; /* surface-gray */
+    --color-ring: #3B82F6; /* blue-500 */
+    
+    /* Card Colors */
+    --color-card: #2A2A2A; /* surface-gray */
+    --color-card-foreground: #F9FAFB; /* gray-50 */
+    
+    /* Popover Colors */
+    --color-popover: #2A2A2A; /* surface-gray */
+    --color-popover-foreground: #F9FAFB; /* gray-50 */
+    
+    /* Muted Colors */
+    --color-muted: #374151; /* gray-700 */
+    --color-muted-foreground: #9CA3AF; /* gray-400 */
+    
+    /* Primary Colors */
+    --color-primary: #3B82F6; /* blue-500 */
+    --color-primary-foreground: #FFFFFF; /* white */
+    
+    /* Secondary Colors */
+    --color-secondary: #6366F1; /* indigo-500 */
+    --color-secondary-foreground: #FFFFFF; /* white */
+    
+    /* Destructive Colors */
+    --color-destructive: #DC2626; /* red-600 */
+    --color-destructive-foreground: #FFFFFF; /* white */
+    
+    /* Accent Colors */
+    --color-accent: #10B981; /* emerald-500 */
+    --color-accent-foreground: #FFFFFF; /* white */
+    
+    /* Success Colors */
+    --color-success: #059669; /* emerald-600 */
+    --color-success-foreground: #FFFFFF; /* white */
+    
+    /* Warning Colors */
+    --color-warning: #D97706; /* amber-600 */
+    --color-warning-foreground: #FFFFFF; /* white */
+    
+    /* Error Colors */
+    --color-error: #DC2626; /* red-600 */
+    --color-error-foreground: #FFFFFF; /* white */
+    
+    /* Shadow Variables */
+    --shadow-card: 0 4px 6px rgba(0, 0, 0, 0.25);
+    --shadow-modal: 0 10px 15px rgba(0, 0, 0, 0.25);
+    
+    /* Border Radius */
+    --radius-card: 8px;
+    --radius-button: 4px;
+  }
+  
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+  }
+  
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  .research-card {
+    @apply bg-card text-card-foreground rounded-lg border border-border;
+    box-shadow: var(--shadow-card);
+  }
+  
+  .research-button {
+    @apply transition-all duration-200 ease-out;
+    transition-timing-function: cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+  
+  .research-hover {
+    @apply transition-all duration-150 ease-out;
+  }
+  
+  .workflow-section {
+    @apply space-y-6 p-8;
+  }
+  
+  .progress-indicator {
+    @apply transition-all duration-300 ease-out;
+    transition-timing-function: cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .animate-smooth {
+    transition-timing-function: cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+}

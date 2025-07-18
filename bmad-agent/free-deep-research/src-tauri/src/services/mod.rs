@@ -10,6 +10,20 @@ pub mod monitoring;
 pub mod security;
 pub mod output_processor;
 pub mod analytics;
+pub mod collaboration;
+pub mod mobile_api;
+
+// V1.2.0 Services
+pub mod plugin_system;
+pub mod workflow_engine;
+pub mod ml_engine;
+pub mod cloud_sync;
+pub mod enterprise;
+
+// V2.0.0 Services
+pub mod distributed;
+pub mod ai_orchestration;
+pub mod realtime_collaboration;
 
 use crate::error::{AppError, AppResult};
 use api_manager::ApiManagerService;
@@ -20,6 +34,20 @@ use monitoring::MonitoringService;
 use security::SecurityService;
 use output_processor::OutputProcessorService;
 use analytics::AnalyticsService;
+use collaboration::CollaborationService;
+use mobile_api::MobileApiService;
+
+// V1.2.0 Services
+use plugin_system::PluginSystemService;
+use workflow_engine::WorkflowEngineService;
+use ml_engine::MLEngineService;
+use cloud_sync::CloudSyncService;
+use enterprise::EnterpriseService;
+
+// V2.0.0 Services
+use distributed::DistributedService;
+use ai_orchestration::AIOrchestrationService;
+use realtime_collaboration::RealtimeCollaborationService;
 
 /// Central service manager that coordinates all application services
 #[derive(Clone)]
@@ -32,6 +60,20 @@ pub struct ServiceManager {
     pub security: Arc<RwLock<SecurityService>>,
     pub output_processor: Arc<RwLock<OutputProcessorService>>,
     pub analytics: Arc<RwLock<AnalyticsService>>,
+    pub collaboration: Arc<RwLock<CollaborationService>>,
+    pub mobile_api: Arc<RwLock<MobileApiService>>,
+
+    // V1.2.0 Services
+    pub plugin_system: Arc<RwLock<PluginSystemService>>,
+    pub workflow_engine: Arc<RwLock<WorkflowEngineService>>,
+    pub ml_engine: Arc<RwLock<MLEngineService>>,
+    pub cloud_sync: Arc<RwLock<CloudSyncService>>,
+    pub enterprise: Arc<RwLock<EnterpriseService>>,
+
+    // V2.0.0 Services
+    pub distributed: Arc<RwLock<DistributedService>>,
+    pub ai_orchestration: Arc<RwLock<AIOrchestrationService>>,
+    pub realtime_collaboration: Arc<RwLock<RealtimeCollaborationService>>,
 }
 
 impl ServiceManager {
