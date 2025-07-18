@@ -20,6 +20,27 @@ pub struct OpenRouterRequest {
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
     pub stream: Option<bool>,
+    pub frequency_penalty: Option<f32>,
+    pub presence_penalty: Option<f32>,
+    pub stop: Option<Vec<String>>,
+    pub seed: Option<u32>,
+    pub tools: Option<Vec<OpenRouterTool>>,
+    pub tool_choice: Option<String>,
+}
+
+/// OpenRouter.ai tool structure for function calling
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRouterTool {
+    pub r#type: String,
+    pub function: OpenRouterFunction,
+}
+
+/// OpenRouter.ai function structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRouterFunction {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
 }
 
 /// OpenRouter.ai message structure
@@ -54,6 +75,53 @@ pub struct OpenRouterUsage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    pub cost: Option<f64>,
+}
+
+/// OpenRouter.ai model information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRouterModel {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub context_length: u32,
+    pub pricing: OpenRouterPricing,
+    pub top_provider: Option<OpenRouterProvider>,
+    pub per_request_limits: Option<OpenRouterLimits>,
+    pub architecture: Option<OpenRouterArchitecture>,
+}
+
+/// OpenRouter.ai pricing structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRouterPricing {
+    pub prompt: String,
+    pub completion: String,
+    pub request: Option<String>,
+    pub image: Option<String>,
+}
+
+/// OpenRouter.ai provider information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRouterProvider {
+    pub order: u32,
+    pub context_length: Option<u32>,
+    pub max_completion_tokens: Option<u32>,
+    pub is_moderated: Option<bool>,
+}
+
+/// OpenRouter.ai request limits
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRouterLimits {
+    pub prompt_tokens: Option<String>,
+    pub completion_tokens: Option<String>,
+}
+
+/// OpenRouter.ai model architecture
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRouterArchitecture {
+    pub modality: String,
+    pub tokenizer: String,
+    pub instruct_type: Option<String>,
 }
 
 /// OpenRouter.ai integration
@@ -95,7 +163,7 @@ impl OpenRouterIntegration {
         }
     }
 
-    /// Get available models
+    /// Get available models with detailed information
     pub async fn get_models(&self, api_key: &ApiKey) -> AppResult<Vec<String>> {
         debug!("Getting available models from OpenRouter");
 
@@ -125,6 +193,61 @@ impl OpenRouterIntegration {
             let error_text = response.text().await.unwrap_or_default();
             Err(ApiError::external_service_error("OpenRouter".to_string(), error_text))
         }
+    }
+
+    /// Get detailed model information
+    pub async fn get_models_detailed(&self, api_key: &ApiKey) -> AppResult<Vec<OpenRouterModel>> {
+        debug!("Getting detailed model information from OpenRouter");
+
+        let url = format!("{}/models", self.config.base_url);
+        let response = self.http_client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", api_key.encrypted_key))
+            .header("Content-Type", "application/json")
+            .send()
+            .await
+            .map_err(|e| ApiError::external_service_error("OpenRouter".to_string(), e.to_string()))?;
+
+        if response.status().is_success() {
+            let models_response: serde_json::Value = response.json().await
+                .map_err(|e| ApiError::external_service_error("OpenRouter".to_string(), e.to_string()))?;
+
+            let models: Vec<OpenRouterModel> = models_response["data"]
+                .as_array()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .filter_map(|model| serde_json::from_value(model.clone()).ok())
+                .collect();
+
+            debug!("Retrieved {} detailed models from OpenRouter", models.len());
+            Ok(models)
+        } else {
+            let error_text = response.text().await.unwrap_or_default();
+            Err(ApiError::external_service_error("OpenRouter".to_string(), error_text))
+        }
+    }
+
+    /// Get latest models (Claude 3.5 Sonnet, GPT-4 Turbo, etc.)
+    pub async fn get_latest_models(&self, api_key: &ApiKey) -> AppResult<Vec<OpenRouterModel>> {
+        let all_models = self.get_models_detailed(api_key).await?;
+
+        // Filter for latest high-performance models
+        let latest_models: Vec<OpenRouterModel> = all_models
+            .into_iter()
+            .filter(|model| {
+                let id = model.id.to_lowercase();
+                id.contains("claude-3.5-sonnet") ||
+                id.contains("gpt-4-turbo") ||
+                id.contains("gpt-4o") ||
+                id.contains("gemini-1.5-pro") ||
+                id.contains("llama-3.1-405b") ||
+                id.contains("mixtral-8x22b") ||
+                id.contains("qwen2.5-72b")
+            })
+            .collect();
+
+        debug!("Found {} latest models", latest_models.len());
+        Ok(latest_models)
     }
 
     /// Make a chat completion request
