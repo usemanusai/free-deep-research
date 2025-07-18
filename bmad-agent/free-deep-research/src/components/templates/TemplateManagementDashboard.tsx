@@ -1,26 +1,32 @@
 import React, { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-
-interface ResearchTemplate {
-  id: string
-  name: string
-  description: string
-  category: 'academic' | 'business' | 'technical' | 'market' | 'competitive' | 'scientific' | 'legal' | 'medical' | 'financial' | 'custom'
-  methodology: 'don_lim' | 'nick_scamara' | 'hybrid' | 'custom'
-  version: string
-  author: string
-  organization?: string
-  is_public: boolean
-  is_featured: boolean
-  usage_count: number
-  rating: number
-  rating_count: number
-  created_at: string
-  updated_at: string
-  tags: string[]
-  parameters: TemplateParameter[]
-  steps: TemplateStep[]
-}
+import {
+  DocumentTextIcon,
+  PlusIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  StarIcon,
+  PlayIcon,
+  EyeIcon,
+  PencilIcon,
+  TrashIcon,
+  ChartBarIcon,
+  UserIcon,
+  TagIcon,
+  CalendarIcon,
+  ClockIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/react/24/outline'
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
+import {
+  ResearchTemplate,
+  TemplateParameter,
+  TemplateStep,
+  ParameterValidation
+} from '@/types/api'
+import LoadingSpinner from '@/components/common/LoadingSpinner'
+import ErrorAlert from '@/components/common/ErrorAlert'
 
 interface TemplateParameter {
   id: string
@@ -67,6 +73,14 @@ interface TemplateExecutionContext {
   workflow_name: string
   created_by: string
   execution_metadata: Record<string, any>
+}
+
+interface TemplateCategory {
+  id: string
+  name: string
+  description: string
+  count: number
+  icon: string
 }
 
 export default function TemplateManagementDashboard() {
