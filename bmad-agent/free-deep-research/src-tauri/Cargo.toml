@@ -84,6 +84,65 @@ parking_lot = "0.12"
 base64 = "0.22"
 dirs = "5.0"
 
+# Export and document generation (V1.1.0)
+wkhtmltopdf = "0.5"
+docx-rs = "0.4"
+zip = "0.6"
+tempfile = "3.8"
+image = "0.24"
+plotters = "0.3"
+
+# V1.2.0 Dependencies
+# Plugin system and sandboxing
+wasmtime = "15.0"
+libloading = "0.8"
+seccomp = "0.4"
+
+# Machine learning and analytics
+candle-core = "0.3"
+candle-nn = "0.3"
+ndarray = "0.15"
+linfa = "0.7"
+smartcore = "0.3"
+
+# Cloud storage providers
+aws-sdk-s3 = "0.39"
+google-cloud-storage = "0.15"
+azure_storage = "0.17"
+azure_storage_blobs = "0.17"
+
+# Enterprise features
+jsonwebtoken = "9.2"
+ldap3 = "0.11"
+saml2 = "0.6"
+bcrypt = "0.15"
+
+# Workflow engine
+petgraph = "0.6"
+daggy = "0.8"
+
+# V2.0.0 Dependencies
+# Distributed systems and microservices
+consul = "0.4"
+etcd-rs = "1.0"
+kubernetes = "0.87"
+docker-api = "0.14"
+
+# Real-time communication
+tokio-tungstenite = "0.20"
+tonic = "0.10"
+prost = "0.12"
+
+# Advanced security
+ring = "0.17"
+aes-gcm = "0.10"
+x25519-dalek = "2.0"
+
+# Performance and monitoring
+prometheus = "0.13"
+opentelemetry = "0.21"
+jaeger = "0.20"
+
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL

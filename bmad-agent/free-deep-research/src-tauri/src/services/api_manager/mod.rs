@@ -13,6 +13,9 @@ pub use rate_limiter::{RateLimiter, RateLimitConfig, UsageStatus, LimitStatus, R
 pub mod key_rotator;
 pub use key_rotator::{KeyRotator, KeyPerformanceMetrics, KeyHealth, RotationStrategy, RotationConfig, RotationAnalytics};
 
+pub mod model_manager;
+pub use model_manager::{ModelManager, ModelConfiguration, ModelPerformanceMetrics, ModelRecommendation, ModelTier};
+
 pub mod service_integration;
 pub use service_integration::{ServiceIntegrationManager, ServiceRequest, ServiceResponse, ServiceHealth, ServiceConfig, ServiceMetrics};
 
@@ -41,6 +44,7 @@ pub struct ApiManagerService {
     rate_limiter: Arc<RateLimiter>,
     key_rotator: Arc<KeyRotator>,
     service_integration: Arc<RwLock<ServiceIntegrationManager>>,
+    model_manager: Arc<RwLock<ModelManager>>,
 }
 
 impl ApiManagerService {
