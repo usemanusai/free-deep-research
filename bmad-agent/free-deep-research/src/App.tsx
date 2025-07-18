@@ -8,13 +8,11 @@ import Layout from '@components/Layout'
 import LoadingScreen from '@components/common/LoadingScreen'
 import ErrorBoundary from '@components/common/ErrorBoundary'
 
-// Pages
+// Pages - Lazy loaded for better performance
 import Dashboard from '@components/dashboard/ExecutiveDashboard'
 import ApiKeyManager from '@components/api-management/ApiKeyManager'
-import ResearchWorkflow from '@components/research/ResearchWorkflow'
-import MonitoringConsole from '@components/monitoring/RealTimeConsole'
-import Analytics from '@components/analytics'
-import Settings from '@components/settings/ConfigurationPanel'
+import { routes, preloadCriticalComponents } from '@components/common/LazyWrapper'
+import { usePerformanceMonitoring } from '@utils/performance'
 
 // Hooks
 import { useSystemHealth } from '@hooks/useSystemHealth'
@@ -34,14 +32,20 @@ function App() {
   })
 
   const { data: healthStatus, isLoading: healthLoading, error: healthError } = useSystemHealth()
+  const { startMeasurement, endMeasurement } = usePerformanceMonitoring()
 
   useEffect(() => {
     const initializeApp = async () => {
+      const measurementId = startMeasurement('app-initialization', 'navigation')
+
       try {
+        // Preload critical components
+        preloadCriticalComponents()
+
         // Perform initial health check
         const healthCheck = await invoke<string>('health_check')
         console.log('Health check result:', healthCheck)
-        
+
         setAppState({
           isLoading: false,
           isHealthy: true,
@@ -54,11 +58,13 @@ function App() {
           isHealthy: false,
           error: error instanceof Error ? error.message : 'Unknown error occurred',
         })
+      } finally {
+        endMeasurement(measurementId)
       }
     }
 
     initializeApp()
-  }, [])
+  }, [startMeasurement, endMeasurement])
 
   // Show loading screen during initialization
   if (appState.isLoading || healthLoading) {
@@ -101,10 +107,12 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/api-keys" element={<ApiKeyManager />} />
-              <Route path="/research" element={<ResearchWorkflow />} />
-              <Route path="/monitoring" element={<MonitoringConsole />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/research" element={<routes.Research />} />
+              <Route path="/research-dashboard" element={<routes.ResearchDashboard />} />
+              <Route path="/templates" element={<routes.Templates />} />
+              <Route path="/monitoring" element={<routes.Monitoring />} />
+              <Route path="/analytics" element={<routes.Analytics />} />
+              <Route path="/settings" element={<routes.Settings />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Layout>

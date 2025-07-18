@@ -1,10 +1,20 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Bundle analyzer (only in build mode)
+    process.env.ANALYZE && visualizer({
+      filename: 'dist/stats.html',
+      open: true,
+      gzipSize: true,
+      brotliSize: true,
+    })
+  ].filter(Boolean),
   
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
@@ -32,20 +42,72 @@ export default defineConfig({
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     // produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
+    // Chunk size warnings
+    chunkSizeWarningLimit: 1000,
+
     // optimize for production
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          ui: ['@headlessui/react', '@heroicons/react'],
-          charts: ['recharts'],
-          utils: ['axios', 'clsx']
-        }
+          // Vendor chunks
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-ui': ['@headlessui/react', '@heroicons/react'],
+          'vendor-charts': ['recharts', 'chart.js', 'react-chartjs-2'],
+          'vendor-utils': ['clsx', 'date-fns', 'lodash-es'],
+
+          // Feature chunks (will be created by lazy loading)
+          'analytics': [],
+          'research': [],
+          'templates': [],
+          'monitoring': [],
+          'settings': []
+        },
+        // Optimize chunk names
+        chunkFileNames: (chunkInfo) => {
+          const facadeModuleId = chunkInfo.facadeModuleId
+          if (facadeModuleId) {
+            const name = facadeModuleId.split('/').pop()?.replace('.tsx', '').replace('.ts', '')
+            return `chunks/${name}-[hash].js`
+          }
+          return 'chunks/[name]-[hash].js'
+        },
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
+    },
+
+    // Optimize dependencies
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true
     }
   },
-  
+
+  // Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@tanstack/react-query',
+      '@headlessui/react',
+      '@heroicons/react/24/outline',
+      '@heroicons/react/24/solid',
+      'clsx',
+      'date-fns'
+    ],
+    exclude: ['@tauri-apps/api']
+  },
+
+  // Performance optimizations
+  esbuild: {
+    // Remove console.log in production
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+    // Optimize for modern browsers
+    target: 'esnext'
+  },
+
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
