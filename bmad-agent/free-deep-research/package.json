@@ -1,6 +1,6 @@
 {
   "name": "free-deep-research-system",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "description": "Enterprise-grade deep research system operating entirely on free service tiers",
   "type": "module",
   "scripts": {
