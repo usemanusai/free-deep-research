@@ -1,0 +1,341 @@
+# Research-Enhanced BMAD Agent Configuration
+# Integrates BMAD agents with Free Deep Research capabilities
+
+version: "2.1.0"
+schema_version: "1.1"
+last_updated: "2025-01-18"
+integration_enabled: true
+
+# Global Research Integration Settings
+research_integration:
+  enabled: true
+  default_settings:
+    max_research_duration_minutes: 30
+    cost_limit_per_research: 5.00
+    confidence_threshold: 0.75
+    evidence_requirements: "medium"
+    auto_research_enabled: true
+  
+  methodology_preferences:
+    market_research: "hybrid"
+    technical_research: "nick_scamara"
+    competitive_analysis: "don_lim"
+    academic_research: "comprehensive"
+    infrastructure_research: "cost_optimized"
+  
+  api_priorities:
+    primary: ["openrouter", "serpapi", "tavily"]
+    secondary: ["jina", "firecrawl", "exa"]
+    fallback: ["basic_search"]
+
+# Research-Enhanced Agent Definitions
+agents:
+  # Product Manager with Market Research Capabilities
+  - id: "product-manager"
+    name: "John"
+    title: "Product Manager"
+    description: "Research-powered product management specialist with market analysis and competitive intelligence capabilities"
+    persona_file: "agents/product-manager/persona.md"
+    status: "active"
+    version: "2.1.0"
+    
+    # Core capabilities enhanced with research
+    capabilities:
+      - "requirements-analysis"
+      - "stakeholder-management"
+      - "product-strategy"
+      - "market-research"
+      - "competitive-analysis"
+      - "user-research"
+      - "technology-trends-analysis"
+    
+    # Research integration configuration
+    research_integration:
+      enabled: true
+      default_methodology: "hybrid"
+      research_capabilities:
+        - research_type: "MarketAnalysis"
+          methodology: "hybrid"
+          focus_areas: ["market_size", "growth_trends", "customer_segments", "pricing_models"]
+          apis: ["serpapi", "exa", "tavily"]
+          max_duration: 20
+          
+        - research_type: "CompetitiveResearch"
+          methodology: "nick_scamara"
+          focus_areas: ["competitor_features", "pricing", "positioning", "user_reviews"]
+          apis: ["firecrawl", "jina", "openrouter"]
+          max_duration: 15
+          
+        - research_type: "UserResearch"
+          methodology: "don_lim"
+          focus_areas: ["user_behavior", "pain_points", "preferences", "demographics"]
+          apis: ["serpapi", "tavily"]
+          max_duration: 15
+      
+      # Automatic research triggers
+      auto_research_triggers:
+        - task: "create-prd"
+          research_type: "MarketAnalysis"
+          depth: "comprehensive"
+          conditions: ["new_product", "market_entry"]
+          
+        - task: "analyze-requirements"
+          research_type: "UserResearch"
+          depth: "standard"
+          conditions: ["user_facing_features"]
+          
+        - task: "competitive-analysis"
+          research_type: "CompetitiveResearch"
+          depth: "comprehensive"
+          conditions: ["competitive_product"]
+      
+      # Cost and quality controls
+      cost_limits:
+        max_per_research: 3.00
+        max_per_task: 8.00
+        max_daily: 25.00
+      
+      quality_requirements:
+        min_confidence_score: 0.75
+        min_sources: 5
+        min_evidence_items: 8
+        required_source_diversity: 0.6
+
+  # Technical Architect with Technology Research Capabilities  
+  - id: "architect"
+    name: "Fred"
+    title: "Technical Architect"
+    description: "Research-enhanced technical architect with technology evaluation and pattern analysis capabilities"
+    persona_file: "agents/architect/persona.md"
+    status: "active"
+    version: "2.1.0"
+    
+    capabilities:
+      - "system-architecture"
+      - "technical-design"
+      - "technology-selection"
+      - "scalability-planning"
+      - "security-architecture"
+      - "integration-design"
+      - "technology-research"
+      - "architecture-patterns-analysis"
+    
+    research_integration:
+      enabled: true
+      default_methodology: "nick_scamara"
+      research_capabilities:
+        - research_type: "TechnologyEvaluation"
+          methodology: "comprehensive"
+          focus_areas: ["performance", "scalability", "community", "maintenance", "security"]
+          apis: ["github_search", "documentation_crawl", "expert_analysis"]
+          max_duration: 25
+          
+        - research_type: "ArchitecturePatterns"
+          methodology: "academic_research"
+          focus_areas: ["proven_patterns", "case_studies", "best_practices", "anti_patterns"]
+          apis: ["academic_search", "technical_documentation"]
+          max_duration: 20
+          
+        - research_type: "SecurityResearch"
+          methodology: "comprehensive"
+          focus_areas: ["threats", "mitigations", "compliance", "best_practices"]
+          apis: ["security_databases", "vulnerability_research"]
+          max_duration: 15
+      
+      auto_research_triggers:
+        - task: "create-architecture"
+          research_type: "TechnologyEvaluation"
+          depth: "comprehensive"
+          conditions: ["new_technology_stack"]
+          
+        - task: "technology-assessment"
+          research_type: "TechnologyEvaluation"
+          depth: "expert"
+          conditions: ["technology_comparison"]
+          
+        - task: "security-review"
+          research_type: "SecurityResearch"
+          depth: "comprehensive"
+          conditions: ["security_critical"]
+      
+      cost_limits:
+        max_per_research: 4.00
+        max_per_task: 12.00
+        max_daily: 35.00
+      
+      quality_requirements:
+        min_confidence_score: 0.80
+        min_sources: 6
+        min_evidence_items: 10
+        required_source_diversity: 0.7
+
+  # Platform Engineer with Infrastructure Research Capabilities
+  - id: "platform-engineer"
+    name: "Alex"
+    title: "Platform Engineer"
+    description: "Research-powered platform engineer with infrastructure analysis and DevOps best practices research"
+    persona_file: "agents/platform-engineer/persona.md"
+    status: "active"
+    version: "2.1.0"
+    
+    capabilities:
+      - "infrastructure-design"
+      - "devops-automation"
+      - "cloud-architecture"
+      - "ci-cd-pipeline-design"
+      - "monitoring-observability"
+      - "security-compliance"
+      - "infrastructure-research"
+      - "cost-optimization-analysis"
+    
+    research_integration:
+      enabled: true
+      default_methodology: "cost_optimized"
+      research_capabilities:
+        - research_type: "InfrastructureResearch"
+          methodology: "cost_optimized"
+          focus_areas: ["cost_efficiency", "performance", "reliability", "scalability"]
+          apis: ["cloud_documentation", "pricing_analysis", "performance_benchmarks"]
+          max_duration: 20
+          
+        - research_type: "SecurityResearch"
+          methodology: "comprehensive"
+          focus_areas: ["compliance_frameworks", "security_tools", "best_practices"]
+          apis: ["compliance_databases", "security_documentation"]
+          max_duration: 15
+          
+        - research_type: "TechnologyEvaluation"
+          methodology: "industry_analysis"
+          focus_areas: ["devops_tools", "monitoring_solutions", "automation_platforms"]
+          apis: ["devops_communities", "tool_comparisons"]
+          max_duration: 18
+      
+      auto_research_triggers:
+        - task: "infrastructure-design"
+          research_type: "InfrastructureResearch"
+          depth: "comprehensive"
+          conditions: ["new_infrastructure"]
+          
+        - task: "cicd-pipeline"
+          research_type: "TechnologyEvaluation"
+          depth: "standard"
+          conditions: ["pipeline_optimization"]
+          
+        - task: "security-compliance"
+          research_type: "SecurityResearch"
+          depth: "expert"
+          conditions: ["compliance_requirements"]
+      
+      cost_limits:
+        max_per_research: 3.50
+        max_per_task: 10.00
+        max_daily: 30.00
+      
+      quality_requirements:
+        min_confidence_score: 0.75
+        min_sources: 5
+        min_evidence_items: 8
+        required_source_diversity: 0.65
+
+# Research-Enhanced Workflow Definitions
+workflows:
+  research-enhanced-documentation-mode:
+    name: "Research-Enhanced Documentation Mode"
+    description: "Generate research-powered documentation with evidence-based insights"
+    agents: ["product-manager", "architect", "platform-engineer"]
+    research_phases:
+      market_analysis:
+        agent: "product-manager"
+        research_type: "MarketAnalysis"
+        duration: 20
+        deliverable: "market_insights.md"
+      
+      technology_research:
+        agent: "architect"
+        research_type: "TechnologyEvaluation"
+        duration: 25
+        deliverable: "technology_analysis.md"
+      
+      infrastructure_research:
+        agent: "platform-engineer"
+        research_type: "InfrastructureResearch"
+        duration: 20
+        deliverable: "infrastructure_recommendations.md"
+    
+    deliverables: 
+      - "research-enhanced-prd.md"
+      - "evidence-based-architecture.md"
+      - "validated-implementation-checklist.md"
+    estimated_duration: "90-120 minutes"
+  
+  research-enhanced-development-mode:
+    name: "Research-Enhanced Development Mode"
+    description: "Interactive development with real-time research capabilities"
+    agents: ["product-manager", "architect", "platform-engineer"]
+    research_integration: "real_time"
+    deliverables: ["working-application", "research-documentation", "evidence-based-tests"]
+    estimated_duration: "variable"
+
+# Research Quality Gates
+research_quality_gates:
+  - name: "Market Research Validation"
+    description: "Validate market research completeness and accuracy"
+    applicable_agents: ["product-manager"]
+    criteria: 
+      - "market_size_validated"
+      - "competitor_analysis_complete"
+      - "user_research_sufficient"
+    thresholds:
+      confidence_score: 0.75
+      source_count: 5
+      evidence_items: 8
+  
+  - name: "Technology Research Validation"
+    description: "Validate technology research depth and accuracy"
+    applicable_agents: ["architect"]
+    criteria:
+      - "technology_comparison_complete"
+      - "performance_data_available"
+      - "security_assessment_done"
+    thresholds:
+      confidence_score: 0.80
+      source_count: 6
+      evidence_items: 10
+  
+  - name: "Infrastructure Research Validation"
+    description: "Validate infrastructure research and cost analysis"
+    applicable_agents: ["platform-engineer"]
+    criteria:
+      - "cost_analysis_complete"
+      - "performance_benchmarks_available"
+      - "security_compliance_verified"
+    thresholds:
+      confidence_score: 0.75
+      source_count: 5
+      evidence_items: 8
+
+# Research Templates for Agent-Specific Research
+research_templates:
+  product_manager_market_analysis:
+    name: "Market Opportunity Analysis"
+    research_type: "MarketAnalysis"
+    methodology: "hybrid"
+    duration: "25-35 minutes"
+    focus_areas: ["market_size", "growth_trends", "competitive_landscape", "customer_segments"]
+    deliverables: ["market_size_analysis", "growth_projections", "competitive_matrix"]
+    
+  architect_technology_evaluation:
+    name: "Technology Stack Assessment"
+    research_type: "TechnologyEvaluation"
+    methodology: "comprehensive"
+    duration: "30-45 minutes"
+    focus_areas: ["performance_comparison", "scalability_analysis", "community_support", "maintenance_overhead"]
+    deliverables: ["technology_comparison_matrix", "recommendation_report", "implementation_roadmap"]
+    
+  platform_engineer_infrastructure_analysis:
+    name: "Infrastructure Cost-Benefit Analysis"
+    research_type: "InfrastructureResearch"
+    methodology: "cost_optimized"
+    duration: "25-35 minutes"
+    focus_areas: ["cost_optimization", "performance_requirements", "scalability_planning", "security_compliance"]
+    deliverables: ["cost_analysis", "performance_projections", "security_assessment"]

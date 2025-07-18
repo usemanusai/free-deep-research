@@ -1,0 +1,278 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI Agent Orchestrator Configuration Schema",
+  "description": "Validation schema for AI agent configuration files",
+  "type": "object",
+  "required": ["version", "schema_version", "global", "agents"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration version in semantic versioning format"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Schema version for compatibility checking"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date",
+      "description": "Last update date in YYYY-MM-DD format"
+    },
+    "global": {
+      "type": "object",
+      "required": ["default_mode", "timeout_seconds", "professional_mode"],
+      "properties": {
+        "default_mode": {
+          "type": "string",
+          "enum": ["interactive", "yolo"],
+          "description": "Default interaction mode"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 3600,
+          "description": "Default timeout for agent operations"
+        },
+        "max_concurrent_agents": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum number of concurrent agents"
+        },
+        "quality_gates_enabled": {
+          "type": "boolean",
+          "description": "Enable quality gate validation"
+        },
+        "professional_mode": {
+          "type": "boolean",
+          "description": "Enable professional communication standards"
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/agent"
+      }
+    },
+    "workflows": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z-]+$": {
+          "$ref": "#/definitions/workflow"
+        }
+      }
+    },
+    "quality_gates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/quality_gate"
+      }
+    }
+  },
+  "definitions": {
+    "agent": {
+      "type": "object",
+      "required": ["id", "name", "title", "description", "persona_file", "status", "capabilities", "tasks"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z-]+$",
+          "description": "Unique agent identifier"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50,
+          "description": "Agent display name"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Agent professional title"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 500,
+          "description": "Agent description and expertise"
+        },
+        "persona_file": {
+          "type": "string",
+          "pattern": "^agents/[a-z-]+/persona\\.md$",
+          "description": "Path to agent persona definition file"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive", "deprecated"],
+          "description": "Agent availability status"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Agent version"
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z-]+$"
+          },
+          "description": "List of agent capabilities"
+        },
+        "specializations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 200
+          },
+          "description": "Detailed specialization descriptions"
+        },
+        "tasks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/task"
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "templates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "checklists": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "knowledge_base": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "required": ["id", "name", "description", "file"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z-]+$",
+          "description": "Unique task identifier"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 100,
+          "description": "Task display name"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 300,
+          "description": "Task description and purpose"
+        },
+        "file": {
+          "type": "string",
+          "pattern": "^tasks/[a-z-]+\\.md$",
+          "description": "Path to task definition file"
+        },
+        "templates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "checklists": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "estimated_duration": {
+          "type": "string",
+          "pattern": "^\\d+-\\d+ minutes$",
+          "description": "Estimated task duration range"
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": ["name", "description", "agents", "deliverables"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 300
+        },
+        "agents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "deliverables": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "estimated_duration": {
+          "type": "string"
+        }
+      }
+    },
+    "quality_gate": {
+      "type": "object",
+      "required": ["name", "description", "applicable_agents", "criteria"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 300
+        },
+        "applicable_agents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
