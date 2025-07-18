@@ -1,0 +1,246 @@
+# AI Agent Configuration
+# Professional AI agent definitions with capabilities, tasks, and resources
+
+version: "2.0.0"
+schema_version: "1.0"
+last_updated: "2025-01-18"
+
+# Global Configuration
+global:
+  default_mode: "interactive"
+  timeout_seconds: 300
+  max_concurrent_agents: 5
+  quality_gates_enabled: true
+  professional_mode: true
+
+# Agent Definitions
+agents:
+  # Product Management Specialist
+  - id: "product-manager"
+    name: "John"
+    title: "Product Manager"
+    description: "Specializes in product requirements, stakeholder management, and strategic product planning"
+    persona_file: "agents/product-manager/persona.md"
+    status: "active"
+    version: "2.0.0"
+    
+    capabilities:
+      - "requirements-analysis"
+      - "stakeholder-management"
+      - "product-strategy"
+      - "market-research"
+      - "user-story-creation"
+      - "acceptance-criteria-definition"
+    
+    specializations:
+      - "Product Requirements Documents (PRDs)"
+      - "User story development and refinement"
+      - "Stakeholder communication and alignment"
+      - "Product roadmap planning"
+      - "Market analysis and competitive research"
+    
+    tasks:
+      - id: "create-prd"
+        name: "Create Product Requirements Document"
+        description: "Generate comprehensive PRD with requirements, user stories, and acceptance criteria"
+        file: "tasks/create-prd.md"
+        templates: ["prd-template"]
+        checklists: ["pm-checklist"]
+        estimated_duration: "45-90 minutes"
+      
+      - id: "analyze-requirements"
+        name: "Analyze Requirements"
+        description: "Deep analysis of product requirements with gap identification and recommendations"
+        file: "tasks/analyze-requirements.md"
+        templates: ["requirements-analysis-template"]
+        checklists: ["requirements-checklist"]
+        estimated_duration: "30-60 minutes"
+      
+      - id: "stakeholder-interview"
+        name: "Conduct Stakeholder Interview"
+        description: "Structured stakeholder interview process with documentation"
+        file: "tasks/stakeholder-interview.md"
+        templates: ["interview-template"]
+        checklists: ["stakeholder-checklist"]
+        estimated_duration: "60-90 minutes"
+    
+    resources:
+      templates:
+        - "prd-template"
+        - "requirements-template"
+        - "user-story-template"
+        - "stakeholder-interview-template"
+      
+      checklists:
+        - "pm-checklist"
+        - "requirements-checklist"
+        - "stakeholder-checklist"
+        - "quality-gate-checklist"
+      
+      knowledge_base:
+        - "product-management-best-practices"
+        - "agile-methodologies"
+        - "stakeholder-management-guide"
+
+  # Technical Architecture Specialist
+  - id: "architect"
+    name: "Fred"
+    title: "Technical Architect"
+    description: "Specializes in system architecture, technical design, and engineering best practices"
+    persona_file: "agents/architect/persona.md"
+    status: "active"
+    version: "2.0.0"
+    
+    capabilities:
+      - "system-architecture"
+      - "technical-design"
+      - "technology-selection"
+      - "scalability-planning"
+      - "security-architecture"
+      - "integration-design"
+    
+    specializations:
+      - "System architecture and design patterns"
+      - "Technology stack selection and evaluation"
+      - "Scalability and performance optimization"
+      - "Security architecture and compliance"
+      - "API design and integration patterns"
+      - "Database design and data architecture"
+    
+    tasks:
+      - id: "create-architecture"
+        name: "Create System Architecture"
+        description: "Design comprehensive system architecture with diagrams and documentation"
+        file: "tasks/create-architecture.md"
+        templates: ["architecture-template"]
+        checklists: ["architecture-checklist"]
+        estimated_duration: "90-120 minutes"
+      
+      - id: "technology-assessment"
+        name: "Technology Assessment"
+        description: "Evaluate and recommend technology stack with trade-off analysis"
+        file: "tasks/technology-assessment.md"
+        templates: ["tech-assessment-template"]
+        checklists: ["technology-checklist"]
+        estimated_duration: "60-90 minutes"
+      
+      - id: "security-review"
+        name: "Security Architecture Review"
+        description: "Comprehensive security architecture review and recommendations"
+        file: "tasks/security-review.md"
+        templates: ["security-template"]
+        checklists: ["security-checklist"]
+        estimated_duration: "45-75 minutes"
+    
+    resources:
+      templates:
+        - "architecture-template"
+        - "technology-assessment-template"
+        - "security-architecture-template"
+        - "api-design-template"
+      
+      checklists:
+        - "architecture-checklist"
+        - "technology-checklist"
+        - "security-checklist"
+        - "scalability-checklist"
+      
+      knowledge_base:
+        - "architecture-patterns"
+        - "technology-evaluation-framework"
+        - "security-best-practices"
+        - "scalability-guidelines"
+
+  # Platform Engineering Specialist
+  - id: "platform-engineer"
+    name: "Alex"
+    title: "Platform Engineer"
+    description: "Specializes in infrastructure, DevOps, cloud architecture, and platform engineering"
+    persona_file: "agents/platform-engineer/persona.md"
+    status: "active"
+    version: "2.0.0"
+    
+    capabilities:
+      - "infrastructure-design"
+      - "devops-automation"
+      - "cloud-architecture"
+      - "ci-cd-pipeline-design"
+      - "monitoring-observability"
+      - "security-compliance"
+    
+    specializations:
+      - "Cloud-native infrastructure design"
+      - "Kubernetes and container orchestration"
+      - "CI/CD pipeline automation"
+      - "Infrastructure as Code (IaC)"
+      - "Monitoring and observability systems"
+      - "Security and compliance automation"
+    
+    tasks:
+      - id: "infrastructure-design"
+        name: "Design Infrastructure Architecture"
+        description: "Create comprehensive infrastructure architecture with IaC templates"
+        file: "tasks/infrastructure-design.md"
+        templates: ["infrastructure-template"]
+        checklists: ["infrastructure-checklist"]
+        estimated_duration: "90-120 minutes"
+      
+      - id: "cicd-pipeline"
+        name: "Design CI/CD Pipeline"
+        description: "Design and document CI/CD pipeline with automation workflows"
+        file: "tasks/cicd-pipeline.md"
+        templates: ["cicd-template"]
+        checklists: ["cicd-checklist"]
+        estimated_duration: "60-90 minutes"
+    
+    resources:
+      templates:
+        - "infrastructure-template"
+        - "cicd-template"
+        - "monitoring-template"
+        - "security-compliance-template"
+      
+      checklists:
+        - "infrastructure-checklist"
+        - "cicd-checklist"
+        - "security-compliance-checklist"
+        - "monitoring-checklist"
+      
+      knowledge_base:
+        - "cloud-architecture-patterns"
+        - "devops-best-practices"
+        - "kubernetes-guidelines"
+        - "security-compliance-frameworks"
+
+# Workflow Definitions
+workflows:
+  documentation-mode:
+    name: "Documentation Mode"
+    description: "Generate complete project documentation with collaborative agent approach"
+    agents: ["product-manager", "architect", "platform-engineer"]
+    deliverables: ["prd.md", "architecture.md", "checklist.md"]
+    estimated_duration: "3-5 hours"
+  
+  development-mode:
+    name: "Full Development Mode"
+    description: "Interactive development workflow with real-time collaboration"
+    agents: ["product-manager", "architect", "platform-engineer", "developer"]
+    deliverables: ["working-application", "documentation", "tests"]
+    estimated_duration: "variable"
+
+# Quality Gates
+quality_gates:
+  - name: "Requirements Validation"
+    description: "Validate requirements completeness and clarity"
+    applicable_agents: ["product-manager"]
+    criteria: ["completeness", "clarity", "testability", "feasibility"]
+  
+  - name: "Architecture Review"
+    description: "Validate architecture design and technical decisions"
+    applicable_agents: ["architect"]
+    criteria: ["scalability", "security", "maintainability", "performance"]
+  
+  - name: "Infrastructure Validation"
+    description: "Validate infrastructure design and compliance"
+    applicable_agents: ["platform-engineer"]
+    criteria: ["security", "scalability", "cost-optimization", "compliance"]
