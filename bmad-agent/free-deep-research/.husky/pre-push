@@ -1,0 +1,49 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚀 Running pre-push checks..."
+
+# Check if we're in the right directory
+if [ ! -f "package.json" ]; then
+  echo "❌ Error: package.json not found. Make sure you're in the project root."
+  exit 1
+fi
+
+# Run comprehensive test suite
+echo "🧪 Running comprehensive test suite..."
+npm run test:all
+if [ $? -ne 0 ]; then
+  echo "❌ Test suite failed. Please fix failing tests before pushing."
+  exit 1
+fi
+
+# Run security audit
+echo "🔒 Running security audit..."
+npm run audit:security
+if [ $? -ne 0 ]; then
+  echo "⚠️ Security audit found vulnerabilities. Please review and fix before pushing."
+  # Don't exit on audit failures in development, just warn
+  echo "⚠️ Continuing with push, but please address security issues."
+fi
+
+# Build check
+echo "🏗️ Running build check..."
+npm run build:frontend
+if [ $? -ne 0 ]; then
+  echo "❌ Build failed. Please fix build errors before pushing."
+  exit 1
+fi
+
+# Check Rust tests (if src-tauri exists)
+if [ -d "src-tauri" ]; then
+  echo "🦀 Running Rust tests..."
+  cd src-tauri
+  cargo test
+  if [ $? -ne 0 ]; then
+    echo "❌ Rust tests failed. Please fix failing tests before pushing."
+    exit 1
+  fi
+  cd ..
+fi
+
+echo "✅ All pre-push checks passed! Ready to push."

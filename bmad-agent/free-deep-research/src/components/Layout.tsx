@@ -8,7 +8,9 @@ import {
   PresentationChartLineIcon,
   CogIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  DocumentTextIcon,
+  ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline'
 import { clsx } from 'clsx'
 
@@ -20,6 +22,8 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'API Keys', href: '/api-keys', icon: KeyIcon },
   { name: 'Research', href: '/research', icon: BeakerIcon },
+  { name: 'Workflows', href: '/research-dashboard', icon: ClipboardDocumentListIcon },
+  { name: 'Templates', href: '/templates', icon: DocumentTextIcon },
   { name: 'Monitoring', href: '/monitoring', icon: ChartBarIcon },
   { name: 'Analytics', href: '/analytics', icon: PresentationChartLineIcon },
   { name: 'Settings', href: '/settings', icon: CogIcon },
