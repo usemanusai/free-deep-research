@@ -1,0 +1,1540 @@
+openapi: 3.0.3
+info:
+  title: Free Deep Research System API
+  description: |
+    Comprehensive API for the Free Deep Research System, providing AI-powered research capabilities,
+    BMAD agent orchestration, and enterprise-grade research automation.
+    
+    ## Features
+    - AI-powered research workflows
+    - BMAD agent integration
+    - Evidence-based documentation
+    - Real-time collaboration
+    - Advanced analytics
+    
+    ## Authentication
+    All endpoints require API key authentication via the `Authorization` header.
+  version: 3.0.0
+  contact:
+    name: Free Deep Research System
+    url: https://github.com/usemanusai/free-deep-research
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api
+    description: Local development server
+  - url: https://api.freedeepresearch.org
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  # Health & System
+  /health:
+    get:
+      tags: [Health]
+      summary: System health check
+      description: Check the overall health status of the system
+      responses:
+        '200':
+          description: System health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /health/system:
+    get:
+      tags: [Health]
+      summary: Detailed system health check
+      description: Get detailed health information for all system components
+      responses:
+        '200':
+          description: Detailed system health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemHealthStatus'
+
+  # Authentication & API Keys
+  /auth/keys:
+    get:
+      tags: [Authentication]
+      summary: List API keys
+      description: Retrieve all configured API keys for the current user
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiKey'
+
+    post:
+      tags: [Authentication]
+      summary: Add API key
+      description: Add a new API key for external service integration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiKeyRequest'
+      responses:
+        '201':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+
+  /auth/keys/{keyId}:
+    put:
+      tags: [Authentication]
+      summary: Update API key
+      description: Update an existing API key
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateApiKeyRequest'
+      responses:
+        '200':
+          description: API key updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+
+    delete:
+      tags: [Authentication]
+      summary: Delete API key
+      description: Remove an API key
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: API key deleted successfully
+
+  /auth/keys/{keyId}/test:
+    post:
+      tags: [Authentication]
+      summary: Test API key
+      description: Test connectivity and validity of an API key
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: API key test results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyTestResult'
+
+  # Research Workflows
+  /research/workflows:
+    get:
+      tags: [Research]
+      summary: List research workflows
+      description: Retrieve all research workflows for the current user
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, completed, failed, cancelled]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of research workflows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflows:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchWorkflow'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [Research]
+      summary: Create research workflow
+      description: Create a new research workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkflowRequest'
+      responses:
+        '201':
+          description: Research workflow created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchWorkflow'
+
+  /research/workflows/{workflowId}:
+    get:
+      tags: [Research]
+      summary: Get research workflow
+      description: Retrieve details of a specific research workflow
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Research workflow details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchWorkflow'
+
+    put:
+      tags: [Research]
+      summary: Update research workflow
+      description: Update an existing research workflow
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkflowRequest'
+      responses:
+        '200':
+          description: Research workflow updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchWorkflow'
+
+    delete:
+      tags: [Research]
+      summary: Delete research workflow
+      description: Delete a research workflow
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Research workflow deleted successfully
+
+  /research/workflows/{workflowId}/execute:
+    post:
+      tags: [Research]
+      summary: Execute research workflow
+      description: Start execution of a research workflow
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Research workflow execution started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Research workflow execution started"
+                  executionId:
+                    type: string
+                    format: uuid
+
+  /research/workflows/{workflowId}/cancel:
+    post:
+      tags: [Research]
+      summary: Cancel research workflow
+      description: Cancel a running research workflow
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Research workflow cancelled successfully
+
+  /research/workflows/{workflowId}/results:
+    get:
+      tags: [Research]
+      summary: Get research results
+      description: Retrieve results of a completed research workflow
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Research workflow results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchResults'
+
+  # BMAD Integration
+  /bmad/documentation-mode:
+    post:
+      tags: [BMAD Integration]
+      summary: Execute documentation mode
+      description: Execute BMAD's research-enhanced documentation mode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentationModeRequest'
+      responses:
+        '200':
+          description: Documentation mode execution completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentationModeResponse'
+
+  /bmad/agent-research:
+    post:
+      tags: [BMAD Integration]
+      summary: Conduct agent research
+      description: Execute research using specific BMAD AI agents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BMadResearchRequest'
+      responses:
+        '200':
+          description: Agent research completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BMadResearchResponse'
+
+  /bmad/health:
+    get:
+      tags: [BMAD Integration]
+      summary: Get BMAD integration health
+      description: Check the health status of BMAD integration
+      responses:
+        '200':
+          description: BMAD integration health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BMadHealthStatus'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: API key authentication. Use format "Bearer YOUR_API_KEY"
+
+  schemas:
+    # Health Schemas
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        uptime:
+          type: string
+
+    SystemHealthStatus:
+      type: object
+      properties:
+        overall:
+          $ref: '#/components/schemas/HealthStatus'
+        services:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ServiceHealth'
+
+    ServiceHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        responseTime:
+          type: number
+        lastCheck:
+          type: string
+          format: date-time
+        details:
+          type: object
+
+    # API Key Schemas
+    ApiKey:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        service:
+          type: string
+          enum: [openrouter, serpapi, jina, firecrawl, tavily]
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, expired]
+        createdAt:
+          type: string
+          format: date-time
+        lastUsed:
+          type: string
+          format: date-time
+        usageStats:
+          $ref: '#/components/schemas/UsageStats'
+
+    CreateApiKeyRequest:
+      type: object
+      required: [service, name, key]
+      properties:
+        service:
+          type: string
+          enum: [openrouter, serpapi, jina, firecrawl, tavily]
+        name:
+          type: string
+        key:
+          type: string
+        rateLimit:
+          type: integer
+          minimum: 1
+
+    UpdateApiKeyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        key:
+          type: string
+        rateLimit:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [active, inactive]
+
+    ApiKeyTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        responseTime:
+          type: number
+        error:
+          type: string
+        details:
+          type: object
+
+    UsageStats:
+      type: object
+      properties:
+        totalRequests:
+          type: integer
+        successfulRequests:
+          type: integer
+        failedRequests:
+          type: integer
+        rateLimitHits:
+          type: integer
+
+    # Research Schemas
+    ResearchWorkflow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        query:
+          type: string
+        methodology:
+          type: string
+          enum: [donlim, nickscamara, hybrid, comprehensive]
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    CreateWorkflowRequest:
+      type: object
+      required: [name, query, methodology]
+      properties:
+        name:
+          type: string
+        query:
+          type: string
+        methodology:
+          type: string
+          enum: [donlim, nickscamara, hybrid, comprehensive]
+        parameters:
+          type: object
+
+    UpdateWorkflowRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        query:
+          type: string
+        methodology:
+          type: string
+          enum: [donlim, nickscamara, hybrid, comprehensive]
+        parameters:
+          type: object
+
+    ResearchResults:
+      type: object
+      properties:
+        workflowId:
+          type: string
+          format: uuid
+        summary:
+          type: string
+        findings:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResearchSource'
+        metadata:
+          $ref: '#/components/schemas/ResearchMetadata'
+
+    ResearchSource:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        title:
+          type: string
+        provider:
+          type: string
+        accessedAt:
+          type: string
+          format: date-time
+        relevanceScore:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    ResearchMetadata:
+      type: object
+      properties:
+        methodologyUsed:
+          type: string
+        apisAccessed:
+          type: array
+          items:
+            type: string
+        durationSeconds:
+          type: integer
+        costEstimate:
+          type: number
+        stepsExecuted:
+          type: integer
+        sourcesAnalyzed:
+          type: integer
+
+    # BMAD Integration Schemas
+    DocumentationModeRequest:
+      type: object
+      required: [projectDescription, requirements, targetAudience]
+      properties:
+        projectDescription:
+          type: string
+        requirements:
+          type: array
+          items:
+            type: string
+        targetAudience:
+          type: string
+          enum: [development_team, stakeholders, end_users]
+        outputFormat:
+          type: string
+          enum: [professional_handoff, technical_spec, executive_summary]
+        researchDepth:
+          type: string
+          enum: [rapid, standard, comprehensive]
+        includeEvidence:
+          type: boolean
+          default: true
+
+    DocumentationModeResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed, in_progress]
+        documents:
+          type: object
+          properties:
+            prd:
+              $ref: '#/components/schemas/GeneratedDocument'
+            architecture:
+              $ref: '#/components/schemas/GeneratedDocument'
+            checklist:
+              $ref: '#/components/schemas/GeneratedDocument'
+        metadata:
+          $ref: '#/components/schemas/BMadMetadata'
+
+    GeneratedDocument:
+      type: object
+      properties:
+        filename:
+          type: string
+        content:
+          type: string
+        evidenceSources:
+          type: integer
+        confidenceScore:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    BMadResearchRequest:
+      type: object
+      required: [agentId, query, researchType]
+      properties:
+        agentId:
+          type: string
+        agentName:
+          type: string
+        query:
+          type: string
+        researchType:
+          type: string
+          enum: [market_analysis, competitive_research, technology_evaluation, architecture_patterns]
+        methodology:
+          type: string
+          enum: [donlim, nickscamara, hybrid, comprehensive]
+        focusAreas:
+          type: array
+          items:
+            type: string
+        depth:
+          type: string
+          enum: [rapid, standard, comprehensive]
+        maxDurationMinutes:
+          type: integer
+          minimum: 5
+          maximum: 60
+        costLimit:
+          type: number
+          minimum: 0
+
+    BMadResearchResponse:
+      type: object
+      properties:
+        researchId:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed, in_progress]
+        results:
+          $ref: '#/components/schemas/BMadResearchResults'
+        metadata:
+          $ref: '#/components/schemas/ResearchMetadata'
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+
+    BMadResearchResults:
+      type: object
+      properties:
+        summary:
+          type: string
+        keyFindings:
+          type: array
+          items:
+            type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResearchEvidence'
+
+    ResearchEvidence:
+      type: object
+      properties:
+        claim:
+          type: string
+        evidence:
+          type: string
+        source:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        relevance:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    BMadHealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        services:
+          type: object
+          properties:
+            agentOrchestrator:
+              $ref: '#/components/schemas/ServiceHealth'
+            researchBridge:
+              $ref: '#/components/schemas/ServiceHealth'
+            evidenceProcessor:
+              $ref: '#/components/schemas/ServiceHealth'
+        performance:
+          type: object
+          properties:
+            averageResponseTime:
+              type: string
+            successRate:
+              type: number
+            uptime:
+              type: string
+
+    BMadMetadata:
+      type: object
+      properties:
+        totalResearchTime:
+          type: string
+        totalCost:
+          type: string
+        agentsInvolved:
+          type: array
+          items:
+            type: string
+        evidenceQuality:
+          type: string
+          enum: [low, medium, high, excellent]
+        readinessScore:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    # Common Schemas
+    Pagination:
+      type: object
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: string
+
+  # Research Enhancement
+  /research/enhance/document:
+    post:
+      tags: [Research Enhancement]
+      summary: Generate evidence-based document
+      description: Generate professional documentation with integrated research evidence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResearchEnhancedDocumentRequest'
+      responses:
+        '200':
+          description: Evidence-based document generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchEnhancedDocument'
+
+  /research/enhance/validate:
+    post:
+      tags: [Research Enhancement]
+      summary: Validate research evidence
+      description: Validate research findings and assess evidence quality
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResearchValidationRequest'
+      responses:
+        '200':
+          description: Research validation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchValidation'
+
+  /research/enhance/synthesize:
+    post:
+      tags: [Research Enhancement]
+      summary: Synthesize research findings
+      description: Synthesize research from multiple sources with conflict resolution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResearchSynthesisRequest'
+      responses:
+        '200':
+          description: Research synthesis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchSynthesis'
+
+  # Analytics
+  /analytics/research:
+    get:
+      tags: [Analytics]
+      summary: Get research analytics
+      description: Retrieve detailed analytics on research performance and quality
+      parameters:
+        - name: timeRange
+          in: query
+          schema:
+            type: string
+            enum: [last_24h, last_7d, last_30d, last_90d]
+            default: last_7d
+        - name: metrics
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [quality_scores, source_diversity, completion_times, cost_analysis]
+      responses:
+        '200':
+          description: Research analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchAnalytics'
+
+  /analytics/usage:
+    get:
+      tags: [Analytics]
+      summary: Get usage analytics
+      description: Retrieve system usage analytics and metrics
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [hourly, daily, weekly, monthly]
+            default: daily
+      responses:
+        '200':
+          description: Usage analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageAnalytics'
+
+  # Configuration
+  /config:
+    get:
+      tags: [Configuration]
+      summary: Get system configuration
+      description: Retrieve current system configuration
+      responses:
+        '200':
+          description: System configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfiguration'
+
+    put:
+      tags: [Configuration]
+      summary: Update system configuration
+      description: Update system configuration settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SystemConfiguration'
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfiguration'
+
+  /config/reset:
+    post:
+      tags: [Configuration]
+      summary: Reset configuration
+      description: Reset system configuration to default values
+      responses:
+        '200':
+          description: Configuration reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfiguration'
+
+  # Monitoring
+  /monitoring/metrics:
+    get:
+      tags: [Monitoring]
+      summary: Get system metrics
+      description: Retrieve real-time system performance metrics
+      parameters:
+        - name: timeRange
+          in: query
+          schema:
+            type: string
+            enum: [5m, 15m, 1h, 6h, 24h]
+            default: 1h
+      responses:
+        '200':
+          description: System metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemMetrics'
+
+  /monitoring/alerts:
+    get:
+      tags: [Monitoring]
+      summary: Get system alerts
+      description: Retrieve active system alerts and notifications
+      parameters:
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, resolved, acknowledged]
+      responses:
+        '200':
+          description: System alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SystemAlert'
+
+  # WebSocket endpoints (for documentation purposes)
+  /ws/research/monitor:
+    get:
+      tags: [WebSocket]
+      summary: Research monitoring WebSocket
+      description: |
+        WebSocket endpoint for real-time research monitoring updates.
+
+        **Connection URL**: `ws://localhost:8080/api/ws/research/monitor`
+
+        **Message Format**:
+        ```json
+        {
+          "action": "subscribe",
+          "researchId": "uuid"
+        }
+        ```
+      responses:
+        '101':
+          description: WebSocket connection established
+
+    # Additional Research Enhancement Schemas
+    ResearchEnhancedDocumentRequest:
+      type: object
+      required: [documentType, topic]
+      properties:
+        documentType:
+          type: string
+          enum: [technical_specification, research_report, analysis_document]
+        topic:
+          type: string
+        evidenceRequirements:
+          type: object
+          properties:
+            minSources:
+              type: integer
+              minimum: 1
+            sourceTypes:
+              type: array
+              items:
+                type: string
+                enum: [academic, industry_best_practices, case_studies, regulatory]
+            confidenceThreshold:
+              type: number
+              minimum: 0
+              maximum: 1
+            recencyWeight:
+              type: number
+              minimum: 0
+              maximum: 1
+        outputFormat:
+          type: string
+          enum: [markdown, html, pdf]
+          default: markdown
+        includeReferences:
+          type: boolean
+          default: true
+
+    ResearchEnhancedDocument:
+      type: object
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        document:
+          type: object
+          properties:
+            title:
+              type: string
+            content:
+              type: string
+            metadata:
+              type: object
+              properties:
+                wordCount:
+                  type: integer
+                readingTime:
+                  type: string
+                evidenceScore:
+                  type: number
+                confidenceLevel:
+                  type: string
+                  enum: [low, medium, high, excellent]
+            evidence:
+              type: array
+              items:
+                $ref: '#/components/schemas/ResearchEvidence'
+            references:
+              type: array
+              items:
+                $ref: '#/components/schemas/Reference'
+        researchMetadata:
+          type: object
+          properties:
+            sourcesAnalyzed:
+              type: integer
+            evidenceItemsExtracted:
+              type: integer
+            researchDuration:
+              type: string
+            costEstimate:
+              type: number
+            qualityScore:
+              type: number
+
+    Reference:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        publication:
+          type: string
+        year:
+          type: integer
+        url:
+          type: string
+          format: uri
+        accessDate:
+          type: string
+          format: date
+
+    ResearchValidationRequest:
+      type: object
+      required: [researchId]
+      properties:
+        researchId:
+          type: string
+          format: uuid
+        validationCriteria:
+          type: object
+          properties:
+            sourceCredibility:
+              type: number
+              minimum: 0
+              maximum: 1
+            sourceDiversity:
+              type: number
+              minimum: 0
+              maximum: 1
+            recencyWeight:
+              type: number
+              minimum: 0
+              maximum: 1
+            crossValidation:
+              type: boolean
+            expertReview:
+              type: boolean
+
+    ResearchValidation:
+      type: object
+      properties:
+        validationId:
+          type: string
+          format: uuid
+        overallScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        validationResults:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              score:
+                type: number
+              details:
+                type: string
+              recommendations:
+                type: array
+                items:
+                  type: string
+        qualityGates:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [passed, failed, warning]
+              score:
+                type: number
+              threshold:
+                type: number
+        recommendations:
+          type: array
+          items:
+            type: string
+
+    ResearchSynthesisRequest:
+      type: object
+      required: [researchQueries]
+      properties:
+        researchQueries:
+          type: array
+          items:
+            type: string
+        synthesisMethod:
+          type: string
+          enum: [consensus_based, evidence_weighted, expert_guided]
+        conflictResolution:
+          type: string
+          enum: [evidence_weighted, majority_rule, expert_decision]
+        outputFormat:
+          type: string
+          enum: [structured_analysis, narrative_summary, comparative_table]
+
+    ResearchSynthesis:
+      type: object
+      properties:
+        synthesisId:
+          type: string
+          format: uuid
+        synthesis:
+          type: object
+          properties:
+            consensusFindings:
+              type: array
+              items:
+                type: object
+                properties:
+                  topic:
+                    type: string
+                  consensus:
+                    type: string
+                  confidence:
+                    type: number
+                  supportingEvidence:
+                    type: integer
+                  conflictingEvidence:
+                    type: integer
+            conflictResolutions:
+              type: array
+              items:
+                type: object
+                properties:
+                  topic:
+                    type: string
+                  conflictDescription:
+                    type: string
+                  resolution:
+                    type: string
+                  resolutionMethod:
+                    type: string
+                  confidence:
+                    type: number
+            gaps:
+              type: array
+              items:
+                type: object
+                properties:
+                  topic:
+                    type: string
+                  description:
+                    type: string
+                  recommendedResearch:
+                    type: string
+        metadata:
+          type: object
+          properties:
+            totalSources:
+              type: integer
+            synthesisTime:
+              type: string
+            conflictsResolved:
+              type: integer
+            consensusLevel:
+              type: number
+
+    # Analytics Schemas
+    ResearchAnalytics:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date-time
+            end:
+              type: string
+              format: date-time
+        metrics:
+          type: object
+          properties:
+            qualityScores:
+              type: object
+              properties:
+                average:
+                  type: number
+                median:
+                  type: number
+                trend:
+                  type: string
+                  enum: [improving, stable, declining]
+                distribution:
+                  type: object
+                  additionalProperties:
+                    type: integer
+            sourceDiversity:
+              type: object
+              properties:
+                averageSourceTypes:
+                  type: number
+                mostCommonTypes:
+                  type: array
+                  items:
+                    type: string
+                diversityIndex:
+                  type: number
+            completionTimes:
+              type: object
+              properties:
+                average:
+                  type: string
+                median:
+                  type: string
+                fastest:
+                  type: string
+                slowest:
+                  type: string
+            costAnalysis:
+              type: object
+              properties:
+                totalCost:
+                  type: number
+                averageCostPerResearch:
+                  type: number
+                costEfficiencyTrend:
+                  type: string
+        insights:
+          type: array
+          items:
+            type: string
+
+    UsageAnalytics:
+      type: object
+      properties:
+        period:
+          type: string
+        totalRequests:
+          type: integer
+        uniqueUsers:
+          type: integer
+        topEndpoints:
+          type: array
+          items:
+            type: object
+            properties:
+              endpoint:
+                type: string
+              requests:
+                type: integer
+              averageResponseTime:
+                type: number
+        errorRates:
+          type: object
+          additionalProperties:
+            type: number
+
+    # Configuration Schemas
+    SystemConfiguration:
+      type: object
+      properties:
+        version:
+          type: string
+        research:
+          type: object
+          properties:
+            defaultMethodology:
+              type: string
+            maxConcurrentWorkflows:
+              type: integer
+            timeoutMinutes:
+              type: integer
+        api:
+          type: object
+          properties:
+            rateLimits:
+              type: object
+              additionalProperties:
+                type: integer
+            retryAttempts:
+              type: integer
+            timeoutSeconds:
+              type: integer
+        security:
+          type: object
+          properties:
+            encryptionEnabled:
+              type: boolean
+            auditLogging:
+              type: boolean
+            sessionTimeoutMinutes:
+              type: integer
+
+    # Monitoring Schemas
+    SystemMetrics:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        system:
+          type: object
+          properties:
+            cpuUsage:
+              type: number
+            memoryUsage:
+              type: number
+            diskUsage:
+              type: number
+            networkIO:
+              type: object
+              properties:
+                bytesIn:
+                  type: integer
+                bytesOut:
+                  type: integer
+        application:
+          type: object
+          properties:
+            activeConnections:
+              type: integer
+            requestsPerSecond:
+              type: number
+            averageResponseTime:
+              type: number
+            errorRate:
+              type: number
+        services:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+              responseTime:
+                type: number
+              throughput:
+                type: number
+
+    SystemAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        status:
+          type: string
+          enum: [active, resolved, acknowledged]
+        title:
+          type: string
+        description:
+          type: string
+        source:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+
+tags:
+  - name: Health
+    description: System health and status monitoring
+  - name: Authentication
+    description: API key management and authentication
+  - name: Research
+    description: Research workflow management and execution
+  - name: Research Enhancement
+    description: Advanced research capabilities with evidence-based documentation
+  - name: BMAD Integration
+    description: BMAD AI agent orchestration and research enhancement
+  - name: Analytics
+    description: Research and system analytics
+  - name: Configuration
+    description: System configuration management
+  - name: Monitoring
+    description: System monitoring and alerting
+  - name: WebSocket
+    description: Real-time WebSocket connections
