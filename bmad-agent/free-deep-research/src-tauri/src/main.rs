@@ -227,6 +227,73 @@ async fn main() {
             analytics::export_analytics_data,
             analytics::get_analytics_health,
 
+            // V3.0.0 Commands - Global Intelligence Network
+            // Federated Research commands
+            federated_research::register_federated_organization,
+            federated_research::create_research_partnership,
+            federated_research::share_research_session,
+            federated_research::execute_federated_query,
+            federated_research::get_organization_metrics,
+            federated_research::update_privacy_controls,
+            federated_research::get_active_partnerships,
+            federated_research::validate_federated_auth_token,
+            federated_research::create_cross_org_collaboration,
+            federated_research::get_federated_research_statistics,
+            federated_research::test_federated_connection,
+
+            // AI Marketplace commands
+            ai_marketplace::register_marketplace_user,
+            ai_marketplace::publish_ai_agent,
+            ai_marketplace::publish_research_methodology,
+            ai_marketplace::search_marketplace,
+            ai_marketplace::install_ai_agent,
+            ai_marketplace::submit_community_rating,
+            ai_marketplace::get_marketplace_user_analytics,
+            ai_marketplace::get_featured_agents,
+            ai_marketplace::get_trending_methodologies,
+            ai_marketplace::get_user_marketplace_content,
+            ai_marketplace::get_marketplace_statistics,
+            ai_marketplace::get_agent_categories,
+
+            // Quantum-Ready Architecture commands
+            quantum_ready::register_quantum_algorithm,
+            quantum_ready::register_compute_resource,
+            quantum_ready::assess_quantum_readiness,
+            quantum_ready::plan_quantum_migration,
+            quantum_ready::execute_hybrid_crypto_operation,
+            quantum_ready::get_available_quantum_algorithms,
+            quantum_ready::get_quantum_readiness_summary,
+
+            // NLP Engine commands
+            nlp_engine::register_nlp_model,
+            nlp_engine::process_semantic_query,
+            nlp_engine::conduct_literature_review,
+            nlp_engine::expand_query,
+            nlp_engine::analyze_text,
+            nlp_engine::get_available_nlp_models,
+
+            // Blockchain Integration commands
+            blockchain::submit_peer_review,
+            blockchain::validate_research,
+            blockchain::distribute_token_rewards,
+            blockchain::create_blockchain_transaction,
+            blockchain::get_audit_trail,
+            blockchain::get_blockchain_network_statistics,
+            blockchain::get_user_token_balance,
+            blockchain::get_research_validation_status,
+
+            // Knowledge Graph commands
+            knowledge_graph::create_knowledge_node,
+            knowledge_graph::create_knowledge_relationship,
+            knowledge_graph::register_data_source,
+            knowledge_graph::traverse_knowledge_graph,
+            knowledge_graph::create_graph_visualization,
+            knowledge_graph::extract_knowledge_from_source,
+            knowledge_graph::get_knowledge_graph_statistics,
+            knowledge_graph::search_knowledge_nodes,
+            knowledge_graph::get_node_neighbors,
+            knowledge_graph::get_knowledge_insights,
+
             // Health check
             health_check
         ])
