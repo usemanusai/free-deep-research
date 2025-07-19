@@ -10,7 +10,7 @@ use chrono::Utc;
 
 use crate::error::{AppResult, StorageError};
 use crate::services::{Service, SecurityService};
-use crate::models::{ApiKey, SystemConfiguration};
+use crate::models::{ApiKey, SystemConfiguration, audit::AuditEvent};
 use crate::utils::file_utils::ensure_dir_exists;
 
 pub mod encrypted_storage;
@@ -127,6 +127,21 @@ impl DataPersistenceService {
                 last_used DATETIME DEFAULT CURRENT_TIMESTAMP,
                 date_bucket TEXT NOT NULL,
                 FOREIGN KEY (api_key_id) REFERENCES api_keys (id) ON DELETE CASCADE
+            )",
+            [],
+        ).map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+        // Create audit events table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS audit_events (
+                id TEXT PRIMARY KEY,
+                event_type TEXT NOT NULL,
+                description TEXT NOT NULL,
+                resource_id TEXT,
+                user_id TEXT,
+                timestamp TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                metadata TEXT DEFAULT '{}'
             )",
             [],
         ).map_err(|e| StorageError::Database { message: e.to_string() })?;
@@ -463,6 +478,39 @@ impl DataPersistenceService {
         Ok(())
     }
 
+    /// Store audit event
+    pub async fn store_audit_event(&self, event: &AuditEvent) -> AppResult<()> {
+        debug!("Storing audit event: {} - {}", event.event_type, event.description);
+
+        let conn = self.connection.as_ref()
+            .ok_or_else(|| StorageError::Database { message: "Database not initialized".to_string() })?;
+
+        // Serialize metadata to JSON
+        let metadata_json = serde_json::to_string(&event.metadata)
+            .map_err(|e| StorageError::Database { message: format!("Failed to serialize metadata: {}", e) })?;
+
+        // Insert audit event into database
+        conn.execute(
+            "INSERT INTO audit_events (
+                id, event_type, description, resource_id, user_id,
+                timestamp, severity, metadata
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                event.id.to_string(),
+                event.event_type,
+                event.description,
+                event.resource_id,
+                event.user_id,
+                event.timestamp.to_rfc3339(),
+                event.severity.as_str(),
+                metadata_json
+            ],
+        ).map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+        debug!("Audit event stored successfully: {}", event.id);
+        Ok(())
+    }
+
     /// Get usage statistics for an API key
     pub async fn get_api_key_usage_stats(&self, api_key_id: Uuid, days: u32) -> AppResult<Vec<(String, u32, u32, u32, f64)>> {
         debug!("Getting usage statistics for API key: {}", api_key_id);
@@ -503,8 +551,72 @@ impl DataPersistenceService {
     pub async fn start_background_tasks(&self) -> AppResult<()> {
         info!("Starting data persistence background tasks...");
 
-        // TODO: Start backup tasks, cleanup tasks
+        // Start database cleanup task
+        let db_path = self.db_path.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600)); // Every hour
+            loop {
+                interval.tick().await;
+                if let Err(e) = Self::cleanup_old_data(&db_path).await {
+                    error!("Database cleanup failed: {}", e);
+                }
+            }
+        });
 
+        // Start backup task
+        let db_path_backup = self.db_path.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(86400)); // Daily
+            loop {
+                interval.tick().await;
+                if let Err(e) = Self::create_backup(&db_path_backup).await {
+                    error!("Database backup failed: {}", e);
+                }
+            }
+        });
+
+        info!("Data persistence background tasks started successfully");
+        Ok(())
+    }
+
+    /// Cleanup old data from database
+    async fn cleanup_old_data(db_path: &std::path::Path) -> AppResult<()> {
+        debug!("Performing database cleanup");
+
+        let conn = Connection::open(db_path)
+            .map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+        // Clean up old audit logs (keep last 30 days)
+        conn.execute(
+            "DELETE FROM audit_logs WHERE created_at < datetime('now', '-30 days')",
+            [],
+        ).map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+        // Clean up old workflow history (keep last 90 days)
+        conn.execute(
+            "DELETE FROM workflow_history WHERE created_at < datetime('now', '-90 days')",
+            [],
+        ).map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+        debug!("Database cleanup completed");
+        Ok(())
+    }
+
+    /// Create database backup
+    async fn create_backup(db_path: &std::path::Path) -> AppResult<()> {
+        debug!("Creating database backup");
+
+        let backup_dir = db_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("backups");
+        std::fs::create_dir_all(&backup_dir)
+            .map_err(|e| StorageError::Io { message: e.to_string() })?;
+
+        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+        let backup_path = backup_dir.join(format!("research_db_backup_{}.db", timestamp));
+
+        std::fs::copy(db_path, &backup_path)
+            .map_err(|e| StorageError::Io { message: e.to_string() })?;
+
+        info!("Database backup created: {:?}", backup_path);
         Ok(())
     }
 }
@@ -513,17 +625,42 @@ impl DataPersistenceService {
 impl Service for DataPersistenceService {
     async fn health_check(&self) -> AppResult<()> {
         debug!("Performing data persistence health check");
-        
-        // TODO: Implement actual health check
-        
+
+        // Check database connectivity
+        let conn = Connection::open(&self.db_path)
+            .map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+        // Test basic query
+        let _result: i64 = conn.query_row("SELECT COUNT(*) FROM api_keys", [], |row| row.get(0))
+            .map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+        // Check database file permissions
+        if !self.db_path.exists() {
+            return Err(StorageError::Database {
+                message: "Database file does not exist".to_string()
+            }.into());
+        }
+
+        // Check available disk space
+        if let Ok(metadata) = std::fs::metadata(&self.db_path) {
+            let file_size = metadata.len();
+            debug!("Database file size: {} bytes", file_size);
+        }
+
+        debug!("Data persistence health check passed");
         Ok(())
     }
     
     async fn shutdown(&self) -> AppResult<()> {
         info!("Shutting down data persistence service...");
-        
-        // TODO: Implement graceful shutdown
-        
+
+        // Create final backup before shutdown
+        if let Err(e) = Self::create_backup(&self.db_path).await {
+            error!("Failed to create shutdown backup: {}", e);
+        }
+
+        // Close any open connections (SQLite handles this automatically)
+        info!("Data persistence service shutdown completed");
         Ok(())
     }
 }

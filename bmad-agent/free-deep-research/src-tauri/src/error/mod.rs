@@ -5,11 +5,13 @@ pub mod api_error;
 pub mod research_error;
 pub mod storage_error;
 pub mod security_error;
+pub mod performance_error;
 
 pub use api_error::ApiError;
 pub use research_error::ResearchError;
 pub use storage_error::StorageError;
 pub use security_error::SecurityError;
+pub use performance_error::{PerformanceError, CacheError, DeduplicationError, BackgroundProcessingError, ConnectionPoolError};
 
 /// Main application error type
 #[derive(Error, Debug, Serialize, Deserialize)]
@@ -25,6 +27,9 @@ pub enum AppError {
     
     #[error("Security error: {0}")]
     Security(#[from] SecurityError),
+
+    #[error("Performance error: {0}")]
+    Performance(#[from] PerformanceError),
     
     #[error("Configuration error: {message}")]
     Configuration { message: String },
@@ -118,6 +123,7 @@ impl AppError {
             AppError::Research(_) => "RESEARCH_ERROR",
             AppError::Storage(_) => "STORAGE_ERROR",
             AppError::Security(_) => "SECURITY_ERROR",
+            AppError::Performance(_) => "PERFORMANCE_ERROR",
             AppError::Configuration { .. } => "CONFIGURATION_ERROR",
             AppError::Validation { .. } => "VALIDATION_ERROR",
             AppError::ServiceUnavailable { .. } => "SERVICE_UNAVAILABLE",

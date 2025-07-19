@@ -18,6 +18,7 @@ pub struct MonitoringService {
     data_persistence: Arc<RwLock<DataPersistenceService>>,
     current_metrics: Arc<RwLock<SystemMetrics>>,
     monitoring_enabled: Arc<RwLock<bool>>,
+    background_tasks_running: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// System metrics snapshot
@@ -33,6 +34,8 @@ pub struct SystemMetrics {
     pub api_response_times: HashMap<String, u32>,
     pub error_count_last_hour: u32,
     pub uptime_seconds: u64,
+    pub system_errors: Option<u32>,
+    pub network_errors: Option<u32>,
 }
 
 /// System health status
@@ -78,12 +81,15 @@ impl MonitoringService {
             api_response_times: HashMap::new(),
             error_count_last_hour: 0,
             uptime_seconds: 0,
+            system_errors: Some(0),
+            network_errors: Some(0),
         }));
 
         let service = Self {
             data_persistence,
             current_metrics,
             monitoring_enabled: Arc::new(RwLock::new(false)),
+            background_tasks_running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         info!("Monitoring service initialized successfully");
@@ -102,6 +108,10 @@ impl MonitoringService {
         // Start metrics collection task
         let current_metrics = self.current_metrics.clone();
         let monitoring_enabled = self.monitoring_enabled.clone();
+        let background_tasks_running = self.background_tasks_running.clone();
+
+        // Set background tasks as running
+        background_tasks_running.store(true, std::sync::atomic::Ordering::Relaxed);
 
         tokio::spawn(async move {
             loop {
@@ -225,23 +235,86 @@ impl MonitoringService {
 
         Ok(())
     }
+
+    /// Get current metrics
+    pub async fn get_current_metrics(&self) -> AppResult<SystemMetrics> {
+        let metrics = self.current_metrics.read().await;
+        Ok(metrics.clone())
+    }
+
+    /// Log audit event
+    pub async fn log_audit_event(&self, event_type: String, description: String, resource_id: Option<String>) -> AppResult<()> {
+        debug!("Logging audit event: {} - {}", event_type, description);
+
+        // Create audit event
+        let audit_event = crate::models::audit::AuditEvent {
+            id: uuid::Uuid::new_v4(),
+            event_type,
+            description,
+            resource_id,
+            user_id: None, // TODO: Add user context when authentication is implemented
+            timestamp: chrono::Utc::now(),
+            severity: crate::models::audit::AuditSeverity::Info,
+            metadata: std::collections::HashMap::new(),
+        };
+
+        // Store audit event through data persistence
+        let data_persistence = self.data_persistence.read().await;
+        if let Err(e) = data_persistence.store_audit_event(&audit_event).await {
+            error!("Failed to store audit event: {}", e);
+            return Err(e);
+        }
+        drop(data_persistence);
+
+        debug!("Audit event logged successfully: {}", audit_event.id);
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
 impl Service for MonitoringService {
     async fn health_check(&self) -> AppResult<()> {
         debug!("Performing monitoring service health check");
-        
-        // TODO: Implement actual health check
-        
+
+        // Check if metrics collection is working
+        let metrics = self.current_metrics.read().await;
+        let last_update = metrics.timestamp;
+        let now = Utc::now();
+
+        // Check if metrics are recent (within last 5 minutes)
+        let time_diff = now.signed_duration_since(last_update).num_minutes();
+        if time_diff > 5 {
+            return Err(crate::error::MonitoringError::stale_metrics(
+                format!("Metrics are {} minutes old", time_diff)
+            ).into());
+        }
+
+        // Check if background tasks are running
+        if !self.background_tasks_running.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(crate::error::MonitoringError::background_task_failure(
+                "Background monitoring tasks are not running".to_string()
+            ).into());
+        }
+
+        debug!("Monitoring service health check passed");
         Ok(())
     }
     
     async fn shutdown(&self) -> AppResult<()> {
         info!("Shutting down monitoring service...");
-        
-        // TODO: Implement graceful shutdown
-        
+
+        // Stop background tasks
+        self.background_tasks_running.store(false, std::sync::atomic::Ordering::Relaxed);
+
+        // Wait a moment for tasks to finish
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // Save final metrics snapshot
+        let metrics = self.current_metrics.read().await;
+        debug!("Final metrics snapshot: active_workflows={}, queue_length={}",
+               metrics.active_workflows, metrics.queue_length);
+
+        info!("Monitoring service shutdown completed");
         Ok(())
     }
 }

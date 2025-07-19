@@ -1,0 +1,216 @@
+[
+  {
+    "id": "serpapi-search",
+    "httpRequest": {
+      "method": "GET",
+      "path": "/search",
+      "queryStringParameters": {
+        "engine": ["google"],
+        "q": [".*"]
+      }
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "search_metadata": {
+          "id": "mock-search-123",
+          "status": "Success",
+          "json_endpoint": "https://serpapi.com/searches/mock-search-123.json",
+          "created_at": "2024-01-15 12:00:00 UTC",
+          "processed_at": "2024-01-15 12:00:01 UTC",
+          "google_url": "https://www.google.com/search?q=test+query",
+          "raw_html_file": "https://serpapi.com/searches/mock-search-123.html",
+          "total_time_taken": 1.23
+        },
+        "search_parameters": {
+          "engine": "google",
+          "q": "test query",
+          "google_domain": "google.com",
+          "gl": "us",
+          "hl": "en"
+        },
+        "organic_results": [
+          {
+            "position": 1,
+            "title": "Mock Search Result 1",
+            "link": "https://example.com/result1",
+            "displayed_link": "https://example.com › result1",
+            "snippet": "This is a mock search result for testing purposes. It contains relevant information about the search query.",
+            "date": "Jan 15, 2024"
+          },
+          {
+            "position": 2,
+            "title": "Mock Search Result 2",
+            "link": "https://example.com/result2",
+            "displayed_link": "https://example.com › result2",
+            "snippet": "Another mock search result with different content to simulate real search results.",
+            "date": "Jan 14, 2024"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "tavily-search",
+    "httpRequest": {
+      "method": "POST",
+      "path": "/search",
+      "headers": {
+        "Content-Type": ["application/json"]
+      }
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "query": "test query",
+        "follow_up_questions": null,
+        "answer": "Based on the search results, here is a comprehensive answer to your query.",
+        "images": [],
+        "results": [
+          {
+            "title": "Mock Tavily Result 1",
+            "url": "https://example.com/tavily1",
+            "content": "This is mock content from Tavily search API for testing purposes.",
+            "score": 0.95,
+            "published_date": "2024-01-15"
+          },
+          {
+            "title": "Mock Tavily Result 2", 
+            "url": "https://example.com/tavily2",
+            "content": "Another mock result with different content to simulate real Tavily responses.",
+            "score": 0.87,
+            "published_date": "2024-01-14"
+          }
+        ],
+        "response_time": 1.45
+      }
+    }
+  },
+  {
+    "id": "firecrawl-scrape",
+    "httpRequest": {
+      "method": "POST",
+      "path": "/scrape",
+      "headers": {
+        "Content-Type": ["application/json"]
+      }
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "success": true,
+        "data": {
+          "markdown": "# Mock Scraped Content\n\nThis is mock content scraped from a webpage for testing purposes.\n\n## Section 1\n\nSome mock content here.\n\n## Section 2\n\nMore mock content with different information.",
+          "html": "<html><head><title>Mock Page</title></head><body><h1>Mock Scraped Content</h1><p>This is mock content scraped from a webpage for testing purposes.</p></body></html>",
+          "metadata": {
+            "title": "Mock Page Title",
+            "description": "Mock page description for testing",
+            "language": "en",
+            "sourceURL": "https://example.com/mock-page"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "jina-embeddings",
+    "httpRequest": {
+      "method": "POST",
+      "path": "/embeddings",
+      "headers": {
+        "Content-Type": ["application/json"]
+      }
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "model": "jina-embeddings-v2-base-en",
+        "object": "list",
+        "data": [
+          {
+            "object": "embedding",
+            "index": 0,
+            "embedding": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 10,
+          "total_tokens": 10
+        }
+      }
+    }
+  },
+  {
+    "id": "exa-search",
+    "httpRequest": {
+      "method": "POST",
+      "path": "/search",
+      "headers": {
+        "Content-Type": ["application/json"]
+      }
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "results": [
+          {
+            "id": "mock-exa-1",
+            "url": "https://example.com/exa1",
+            "title": "Mock Exa Search Result 1",
+            "score": 0.92,
+            "publishedDate": "2024-01-15",
+            "author": "Mock Author",
+            "text": "This is mock content from Exa search API for academic and research purposes."
+          },
+          {
+            "id": "mock-exa-2",
+            "url": "https://example.com/exa2", 
+            "title": "Mock Exa Search Result 2",
+            "score": 0.88,
+            "publishedDate": "2024-01-14",
+            "author": "Another Mock Author",
+            "text": "Another mock result with academic content to simulate real Exa responses."
+          }
+        ],
+        "autopromptString": null
+      }
+    }
+  },
+  {
+    "id": "health-check",
+    "httpRequest": {
+      "method": "GET",
+      "path": "/health"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "status": "healthy",
+        "timestamp": "2024-01-15T12:00:00Z",
+        "services": {
+          "database": "healthy",
+          "cache": "healthy",
+          "external_apis": "healthy"
+        }
+      }
+    }
+  }
+]

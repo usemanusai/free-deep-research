@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
+use rand;
 
 use crate::error::{AppResult, ApiError};
 use crate::models::api_key::{ServiceProvider, ApiKey};
@@ -141,6 +142,223 @@ impl ServiceConfig {
                 enabled: true,
             },
         }
+    }
+}
+
+/// Mock service integration for development/testing
+pub struct MockServiceIntegration {
+    service_provider: ServiceProvider,
+    config: ServiceConfig,
+}
+
+impl MockServiceIntegration {
+    pub fn new(service_provider: ServiceProvider) -> Self {
+        let config = ServiceConfig {
+            base_url: match service_provider {
+                ServiceProvider::OpenRouter => "https://openrouter.ai/api/v1".to_string(),
+                ServiceProvider::SerpApi => "https://serpapi.com".to_string(),
+                ServiceProvider::Tavily => "https://api.tavily.com".to_string(),
+                ServiceProvider::Firecrawl => "https://api.firecrawl.dev/v0".to_string(),
+                ServiceProvider::Jina => "https://api.jina.ai/v1".to_string(),
+                ServiceProvider::Exa => "https://api.exa.ai".to_string(),
+            },
+            timeout_ms: 30000,
+            max_retries: 3,
+            rate_limit_per_minute: 60,
+            endpoints: match service_provider {
+                ServiceProvider::OpenRouter => vec!["/chat/completions".to_string(), "/models".to_string()],
+                ServiceProvider::SerpApi => vec!["/search".to_string()],
+                ServiceProvider::Tavily => vec!["/search".to_string()],
+                ServiceProvider::Firecrawl => vec!["/scrape".to_string(), "/map".to_string()],
+                ServiceProvider::Jina => vec!["/embeddings".to_string()],
+                ServiceProvider::Exa => vec!["/search".to_string()],
+            },
+            headers: HashMap::new(),
+        };
+
+        Self {
+            service_provider,
+            config,
+        }
+    }
+
+    /// Generate mock response based on service and endpoint
+    fn generate_mock_response(&self, request: &ServiceRequest) -> ServiceResponse {
+        let mock_data = match (&self.service_provider, request.endpoint.as_str()) {
+            (ServiceProvider::SerpApi, _) => {
+                serde_json::json!({
+                    "organic_results": [
+                        {
+                            "title": "Mock Search Result 1",
+                            "link": "https://example.com/result1",
+                            "snippet": "This is a mock search result for testing purposes."
+                        },
+                        {
+                            "title": "Mock Search Result 2",
+                            "link": "https://example.com/result2",
+                            "snippet": "Another mock search result with relevant information."
+                        }
+                    ],
+                    "search_metadata": {
+                        "status": "Success",
+                        "total_results": 2
+                    }
+                })
+            },
+            (ServiceProvider::Firecrawl, "/scrape") => {
+                serde_json::json!({
+                    "success": true,
+                    "data": {
+                        "markdown": "# Mock Scraped Content\n\nThis is mock content scraped from a webpage for testing purposes.\n\n## Key Points\n- Point 1: Important information\n- Point 2: Additional details\n- Point 3: Relevant data",
+                        "html": "<h1>Mock Scraped Content</h1><p>This is mock content scraped from a webpage for testing purposes.</p>",
+                        "metadata": {
+                            "title": "Mock Page Title",
+                            "description": "Mock page description"
+                        }
+                    }
+                })
+            },
+            (ServiceProvider::Firecrawl, "/map") => {
+                serde_json::json!({
+                    "success": true,
+                    "links": [
+                        "https://example.com/page1",
+                        "https://example.com/page2",
+                        "https://example.com/page3"
+                    ]
+                })
+            },
+            (ServiceProvider::Jina, "/embeddings") => {
+                serde_json::json!({
+                    "data": [
+                        {
+                            "object": "embedding",
+                            "embedding": vec![0.1, 0.2, 0.3, 0.4, 0.5], // Mock embedding vector
+                            "index": 0
+                        }
+                    ],
+                    "model": "jina-embeddings-v2-base-en",
+                    "usage": {
+                        "total_tokens": 10
+                    }
+                })
+            },
+            (ServiceProvider::OpenRouter, "/chat/completions") => {
+                serde_json::json!({
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": "This is a mock AI response for testing purposes. The analysis shows that the research query has been processed successfully."
+                            },
+                            "finish_reason": "stop"
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": 50,
+                        "completion_tokens": 25,
+                        "total_tokens": 75
+                    }
+                })
+            },
+            (ServiceProvider::Tavily, "/search") => {
+                serde_json::json!({
+                    "results": [
+                        {
+                            "title": "Mock Tavily Result 1",
+                            "url": "https://example.com/tavily1",
+                            "content": "Mock content from Tavily search result 1"
+                        },
+                        {
+                            "title": "Mock Tavily Result 2",
+                            "url": "https://example.com/tavily2",
+                            "content": "Mock content from Tavily search result 2"
+                        }
+                    ]
+                })
+            },
+            (ServiceProvider::Exa, "/search") => {
+                serde_json::json!({
+                    "results": [
+                        {
+                            "title": "Mock Exa Academic Result 1",
+                            "url": "https://example.com/exa1",
+                            "text": "Mock academic content from Exa search"
+                        }
+                    ]
+                })
+            },
+            _ => {
+                serde_json::json!({
+                    "message": "Mock response",
+                    "status": "success"
+                })
+            }
+        };
+
+        ServiceResponse {
+            request_id: request.request_id,
+            success: true,
+            status_code: 200,
+            headers: HashMap::new(),
+            body: mock_data.to_string(),
+            response_time_ms: rand::random::<u32>() % 1000 + 200, // Random response time 200-1200ms
+            error_message: None,
+            metadata: HashMap::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl ServiceIntegration for MockServiceIntegration {
+    fn service_provider(&self) -> ServiceProvider {
+        self.service_provider
+    }
+
+    async fn make_request(&self, request: ServiceRequest, _api_key: &ApiKey) -> AppResult<ServiceResponse> {
+        debug!("Making mock request to {:?} endpoint: {}", self.service_provider, request.endpoint);
+
+        // Simulate network delay
+        let delay_ms = rand::random::<u64>() % 500 + 100; // 100-600ms delay
+        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+
+        // Generate mock response
+        let response = self.generate_mock_response(&request);
+
+        debug!("Mock request completed for {:?} in {}ms", self.service_provider, response.response_time_ms);
+        Ok(response)
+    }
+
+    async fn health_check(&self, _api_key: &ApiKey) -> AppResult<ServiceHealth> {
+        // Simulate health check delay
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        Ok(ServiceHealth {
+            service: self.service_provider,
+            status: ServiceStatus::Healthy,
+            response_time_ms: 100,
+            last_check: Utc::now(),
+            error_message: None,
+            metadata: HashMap::new(),
+        })
+    }
+
+    fn get_config(&self) -> &ServiceConfig {
+        &self.config
+    }
+
+    async fn update_config(&mut self, config: ServiceConfig) -> AppResult<()> {
+        self.config = config;
+        Ok(())
+    }
+
+    async fn validate_api_key(&self, api_key: &ApiKey) -> AppResult<bool> {
+        // Mock validation - just check if key is not empty
+        Ok(!api_key.encrypted_key.is_empty())
+    }
+
+    fn get_endpoints(&self) -> Vec<String> {
+        self.config.endpoints.clone()
     }
 }
 
@@ -282,8 +500,17 @@ impl ServiceIntegrationManager {
             configs.insert(service.clone(), ServiceConfig::default_for_service(service));
         }
 
+        // Initialize mock service integrations for development/testing
+        let mut integrations: HashMap<ServiceProvider, Box<dyn ServiceIntegration>> = HashMap::new();
+        integrations.insert(ServiceProvider::OpenRouter, Box::new(MockServiceIntegration::new(ServiceProvider::OpenRouter)));
+        integrations.insert(ServiceProvider::SerpApi, Box::new(MockServiceIntegration::new(ServiceProvider::SerpApi)));
+        integrations.insert(ServiceProvider::Tavily, Box::new(MockServiceIntegration::new(ServiceProvider::Tavily)));
+        integrations.insert(ServiceProvider::Firecrawl, Box::new(MockServiceIntegration::new(ServiceProvider::Firecrawl)));
+        integrations.insert(ServiceProvider::Jina, Box::new(MockServiceIntegration::new(ServiceProvider::Jina)));
+        integrations.insert(ServiceProvider::Exa, Box::new(MockServiceIntegration::new(ServiceProvider::Exa)));
+
         let manager = Self {
-            integrations: HashMap::new(),
+            integrations,
             metrics: Arc::new(RwLock::new(metrics)),
             configs: Arc::new(RwLock::new(configs)),
         };
@@ -495,6 +722,41 @@ impl ServiceIntegrationManager {
         // This would involve periodic health checks and metric updates
 
         info!("Service integration background monitoring started successfully");
+        Ok(())
+    }
+
+    /// Perform comprehensive health check on all service integrations
+    pub async fn health_check(&self) -> AppResult<()> {
+        debug!("Performing service integration manager health check");
+
+        // Check that integrations are loaded
+        if self.integrations.is_empty() {
+            return Err(ApiError::invalid_configuration(
+                "service_integration".to_string(),
+                "No service integrations loaded".to_string()
+            ).into());
+        }
+
+        // Check metrics system
+        let metrics = self.metrics.read().await;
+        debug!("Service integration manager has metrics for {} services", metrics.len());
+        drop(metrics);
+
+        // Check configurations
+        let configs = self.configs.read().await;
+        debug!("Service integration manager has configs for {} services", configs.len());
+        drop(configs);
+
+        // Verify all registered services have configurations
+        for service in self.get_registered_services() {
+            let configs = self.configs.read().await;
+            if !configs.contains_key(&service) {
+                warn!("Service {:?} is registered but has no configuration", service);
+            }
+            drop(configs);
+        }
+
+        debug!("Service integration manager health check completed successfully");
         Ok(())
     }
 }

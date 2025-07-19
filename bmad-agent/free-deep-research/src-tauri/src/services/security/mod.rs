@@ -202,6 +202,12 @@ impl Service for SecurityService {
         info!("Security service shutdown complete");
         Ok(())
     }
+
+    /// Get recent error count from audit logs
+    pub async fn get_recent_error_count(&self) -> AppResult<u32> {
+        let audit_logger = self.audit_logger.read().await;
+        audit_logger.get_recent_error_count().await
+    }
 }
 
 /// Audit event for logging security-related actions

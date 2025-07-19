@@ -1063,6 +1063,20 @@ pub struct QueueStats {
     pub estimated_wait_minutes: u32,
 }
 
+impl Default for QueueStats {
+    fn default() -> Self {
+        Self {
+            queue_length: 0,
+            active_count: 0,
+            max_concurrent: 5,
+            total_completed: 0,
+            total_failed: 0,
+            total_cancelled: 0,
+            estimated_wait_minutes: 0,
+        }
+    }
+}
+
 /// Concurrency configuration and status
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConcurrencyConfig {

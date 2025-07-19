@@ -595,4 +595,55 @@ impl RateLimiter {
         info!("Generated usage report with {} keys and {} alerts", total_keys, recent_alerts.len());
         Ok(report)
     }
+
+    /// Perform health check on the rate limiter
+    pub async fn health_check(&self) -> AppResult<()> {
+        debug!("Performing rate limiter health check");
+
+        // Check data persistence connection
+        let data_persistence = self.data_persistence.read().await;
+        data_persistence.health_check().await?;
+        drop(data_persistence);
+
+        // Check configurations are loaded
+        let configs = self.configs.read().await;
+        if configs.is_empty() {
+            return Err(ApiError::invalid_configuration(
+                "rate_limiter".to_string(),
+                "No rate limit configurations loaded".to_string()
+            ).into());
+        }
+        debug!("Rate limiter has {} service configurations", configs.len());
+        drop(configs);
+
+        // Check alerts system
+        let alerts = self.alerts.read().await;
+        debug!("Rate limiter has {} alerts in memory", alerts.len());
+        drop(alerts);
+
+        // Test basic functionality by checking emergency stop status
+        let emergency_stop = self.is_emergency_stop_enabled().await;
+        debug!("Emergency stop status: {}", emergency_stop);
+
+        debug!("Rate limiter health check completed successfully");
+        Ok(())
+    }
+
+    /// Get recent alerts from the rate limiter
+    pub async fn get_recent_alerts(&self) -> AppResult<Vec<RateLimitAlert>> {
+        debug!("Getting recent alerts from rate limiter");
+
+        let alerts = self.alerts.read().await;
+
+        // Filter alerts from the last hour
+        let one_hour_ago = chrono::Utc::now() - chrono::Duration::hours(1);
+        let recent_alerts: Vec<RateLimitAlert> = alerts
+            .iter()
+            .filter(|alert| alert.timestamp > one_hour_ago)
+            .cloned()
+            .collect();
+
+        debug!("Found {} recent alerts", recent_alerts.len());
+        Ok(recent_alerts)
+    }
 }
