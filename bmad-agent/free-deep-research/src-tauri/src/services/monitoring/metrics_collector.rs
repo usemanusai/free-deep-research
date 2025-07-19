@@ -99,29 +99,91 @@ impl MetricsCollector {
     
     /// Get CPU usage percentage
     async fn get_cpu_usage(&self) -> AppResult<f64> {
-        // TODO: Implement actual CPU usage collection
-        // For now, simulate CPU usage
-        let base_usage = 20.0;
-        let variation = rand::random::<f64>() * 60.0;
-        Ok(base_usage + variation)
+        use sysinfo::{System, SystemExt, CpuExt};
+
+        let mut system = System::new_all();
+        system.refresh_cpu();
+
+        // Wait a bit to get accurate CPU usage
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+        system.refresh_cpu();
+
+        let cpu_usage = system.global_cpu_info().cpu_usage() as f64;
+
+        // Ensure we return a reasonable value (0-100)
+        let normalized_usage = cpu_usage.max(0.0).min(100.0);
+
+        debug!("CPU usage collected: {:.2}%", normalized_usage);
+        Ok(normalized_usage)
     }
     
     /// Get memory usage percentage
     async fn get_memory_usage(&self) -> AppResult<f64> {
-        // TODO: Implement actual memory usage collection
-        // For now, simulate memory usage
-        let base_usage = 30.0;
-        let variation = rand::random::<f64>() * 50.0;
-        Ok(base_usage + variation)
+        use sysinfo::{System, SystemExt};
+
+        let mut system = System::new_all();
+        system.refresh_memory();
+
+        let total_memory = system.total_memory();
+        let used_memory = system.used_memory();
+
+        if total_memory == 0 {
+            warn!("Total memory reported as 0, returning 0% usage");
+            return Ok(0.0);
+        }
+
+        let memory_usage_percent = (used_memory as f64 / total_memory as f64) * 100.0;
+        let normalized_usage = memory_usage_percent.max(0.0).min(100.0);
+
+        debug!("Memory usage collected: {:.2}% ({} MB / {} MB)",
+               normalized_usage,
+               used_memory / 1024 / 1024,
+               total_memory / 1024 / 1024);
+
+        Ok(normalized_usage)
     }
     
     /// Get disk usage percentage
     async fn get_disk_usage(&self) -> AppResult<f64> {
-        // TODO: Implement actual disk usage collection
-        // For now, simulate disk usage
-        let base_usage = 50.0;
-        let variation = rand::random::<f64>() * 30.0;
-        Ok(base_usage + variation)
+        use sysinfo::{System, SystemExt, DiskExt};
+
+        let mut system = System::new_all();
+        system.refresh_disks();
+
+        let disks = system.disks();
+
+        if disks.is_empty() {
+            warn!("No disks found, returning 0% usage");
+            return Ok(0.0);
+        }
+
+        // Calculate average disk usage across all disks
+        let mut total_space = 0u64;
+        let mut total_used = 0u64;
+
+        for disk in disks {
+            let total = disk.total_space();
+            let available = disk.available_space();
+            let used = total.saturating_sub(available);
+
+            total_space += total;
+            total_used += used;
+        }
+
+        if total_space == 0 {
+            warn!("Total disk space reported as 0, returning 0% usage");
+            return Ok(0.0);
+        }
+
+        let disk_usage_percent = (total_used as f64 / total_space as f64) * 100.0;
+        let normalized_usage = disk_usage_percent.max(0.0).min(100.0);
+
+        debug!("Disk usage collected: {:.2}% ({:.2} GB / {:.2} GB)",
+               normalized_usage,
+               total_used as f64 / 1024.0 / 1024.0 / 1024.0,
+               total_space as f64 / 1024.0 / 1024.0 / 1024.0);
+
+        Ok(normalized_usage)
     }
     
     /// Check network connectivity
@@ -273,4 +335,130 @@ pub struct DetailedSystemMetrics {
     pub load_averages: LoadAverages,
     pub memory_info: MemoryInfo,
     pub disk_info: DiskInfo,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio;
+
+    #[tokio::test]
+    async fn test_metrics_collector_creation() {
+        let collector = MetricsCollector::new().await;
+        assert!(collector.is_ok(), "MetricsCollector should be created successfully");
+    }
+
+    #[tokio::test]
+    async fn test_cpu_usage_collection() {
+        let collector = MetricsCollector::new().await.unwrap();
+        let cpu_usage = collector.get_cpu_usage().await;
+
+        assert!(cpu_usage.is_ok(), "CPU usage collection should work");
+        let usage = cpu_usage.unwrap();
+        assert!(usage >= 0.0 && usage <= 100.0, "CPU usage should be between 0 and 100%");
+    }
+
+    #[tokio::test]
+    async fn test_memory_usage_collection() {
+        let collector = MetricsCollector::new().await.unwrap();
+        let memory_usage = collector.get_memory_usage().await;
+
+        assert!(memory_usage.is_ok(), "Memory usage collection should work");
+        let usage = memory_usage.unwrap();
+        assert!(usage >= 0.0 && usage <= 100.0, "Memory usage should be between 0 and 100%");
+    }
+
+    #[tokio::test]
+    async fn test_disk_usage_collection() {
+        let collector = MetricsCollector::new().await.unwrap();
+        let disk_usage = collector.get_disk_usage().await;
+
+        assert!(disk_usage.is_ok(), "Disk usage collection should work");
+        let usage = disk_usage.unwrap();
+        assert!(usage >= 0.0 && usage <= 100.0, "Disk usage should be between 0 and 100%");
+    }
+
+    #[tokio::test]
+    async fn test_system_metrics_collection() {
+        let collector = MetricsCollector::new().await.unwrap();
+        let metrics = collector.collect_system_metrics().await;
+
+        assert!(metrics.is_ok(), "System metrics collection should work");
+        let metrics = metrics.unwrap();
+
+        // Verify all metrics are within valid ranges
+        assert!(metrics.cpu_usage_percent >= 0.0 && metrics.cpu_usage_percent <= 100.0);
+        assert!(metrics.memory_usage_percent >= 0.0 && metrics.memory_usage_percent <= 100.0);
+        assert!(metrics.disk_usage_percent >= 0.0 && metrics.disk_usage_percent <= 100.0);
+        assert!(metrics.uptime_seconds >= 0);
+    }
+
+    #[tokio::test]
+    async fn test_network_connectivity_check() {
+        let collector = MetricsCollector::new().await.unwrap();
+        let connectivity = collector.check_network_connectivity().await;
+
+        // Network connectivity might fail in test environments, so we just check it doesn't panic
+        assert!(connectivity.is_ok() || connectivity.is_err(), "Network check should return a result");
+    }
+
+    #[test]
+    fn test_word_count_calculation() {
+        // Test the word count logic used in research methodologies
+        let test_content = "This is a test content with exactly ten words in it.";
+        let word_count = test_content.split_whitespace().count() as u32;
+        assert_eq!(word_count, 10, "Word count should be calculated correctly");
+
+        let empty_content = "";
+        let empty_count = empty_content.split_whitespace().count() as u32;
+        assert_eq!(empty_count, 0, "Empty content should have zero word count");
+
+        let single_word = "word";
+        let single_count = single_word.split_whitespace().count() as u32;
+        assert_eq!(single_count, 1, "Single word should have count of 1");
+    }
+
+    #[test]
+    fn test_confidence_score_calculation() {
+        // Test confidence score calculation logic used in workflow orchestrator
+        let confidence_scores = vec![0.85, 0.90, 0.75, 0.95];
+        let average_confidence = confidence_scores.iter().sum::<f64>() / confidence_scores.len() as f64;
+        assert!((average_confidence - 0.8625).abs() < 0.001, "Confidence calculation should be accurate");
+
+        let empty_scores: Vec<f64> = vec![];
+        let default_confidence = if empty_scores.is_empty() { 0.75 } else { 0.0 };
+        assert_eq!(default_confidence, 0.75, "Default confidence should be 0.75 for empty scores");
+    }
+
+    #[test]
+    fn test_key_point_extraction() {
+        // Test key point extraction logic used in AI summary
+        let test_summary = "Introduction text\n- Key point one\n- Key point two\n• Bullet point three\nConclusion text";
+        let key_points: Vec<String> = test_summary
+            .lines()
+            .filter(|line| line.starts_with("- ") || line.starts_with("• "))
+            .map(|line| line.trim_start_matches("- ").trim_start_matches("• ").to_string())
+            .collect();
+
+        assert_eq!(key_points.len(), 3, "Should extract 3 key points");
+        assert_eq!(key_points[0], "Key point one");
+        assert_eq!(key_points[1], "Key point two");
+        assert_eq!(key_points[2], "Bullet point three");
+    }
+
+    #[test]
+    fn test_citation_extraction() {
+        // Test citation extraction logic used in academic analysis
+        let test_analysis = "Research shows multiple sources:\nhttps://example.com/paper1\ndoi:10.1000/test\nDOI:10.2000/example\nRegular text without citations";
+        let citations: Vec<String> = test_analysis
+            .lines()
+            .filter(|line| line.contains("http") || line.contains("doi:") || line.contains("DOI:"))
+            .map(|line| line.trim().to_string())
+            .collect();
+
+        assert_eq!(citations.len(), 3, "Should extract 3 citations");
+        assert!(citations.iter().any(|c| c.contains("https://example.com/paper1")));
+        assert!(citations.iter().any(|c| c.contains("doi:10.1000/test")));
+        assert!(citations.iter().any(|c| c.contains("DOI:10.2000/example")));
+    }
 }

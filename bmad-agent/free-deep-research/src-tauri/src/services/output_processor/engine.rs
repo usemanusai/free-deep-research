@@ -27,6 +27,8 @@ struct ProcessingStats {
     failed_outputs: u64,
     processing_times: Vec<u64>,
     format_usage: HashMap<OutputFormat, u64>,
+    total_bytes_processed: u64,
+    template_usage: HashMap<String, u32>,
 }
 
 impl OutputEngine {
@@ -197,12 +199,23 @@ impl OutputEngine {
 
         let error_rate = 100.0 - success_rate;
 
+        // Calculate total file size from all outputs
+        let total_file_size_bytes = stats.total_bytes_processed;
+
+        // Get most used templates from stats
+        let mut template_usage: Vec<(String, u32)> = stats.template_usage.into_iter().collect();
+        template_usage.sort_by(|a, b| b.1.cmp(&a.1));
+        let most_used_templates: Vec<String> = template_usage.into_iter()
+            .take(5)
+            .map(|(template, _)| template)
+            .collect();
+
         Ok(OutputStatistics {
             total_outputs_generated: stats.successful_outputs,
             outputs_by_format: stats.format_usage.clone(),
             average_processing_time_ms,
-            total_file_size_bytes: 0, // TODO: Track total file size
-            most_used_templates: Vec::new(), // TODO: Track template usage
+            total_file_size_bytes,
+            most_used_templates,
             success_rate,
             error_rate,
         })
@@ -211,17 +224,25 @@ impl OutputEngine {
     /// Update internal processing statistics
     async fn update_processing_stats(&self, result: &OutputResult) {
         let mut stats = self.processing_stats.write().await;
-        
+
         stats.total_processed += 1;
         stats.successful_outputs += 1;
         stats.processing_times.push(result.processing_time_ms);
-        
+
         // Keep only last 1000 processing times
         if stats.processing_times.len() > 1000 {
             stats.processing_times.remove(0);
         }
 
         *stats.format_usage.entry(result.format).or_insert(0) += 1;
+
+        // Track file size
+        stats.total_bytes_processed += result.file_size_bytes;
+
+        // Track template usage
+        if let Some(template_name) = &result.metadata.template_used {
+            *stats.template_usage.entry(template_name.clone()).or_insert(0) += 1;
+        }
     }
 
     /// Register a custom formatter

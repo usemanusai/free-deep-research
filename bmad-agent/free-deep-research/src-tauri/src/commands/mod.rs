@@ -19,6 +19,11 @@ pub mod blockchain;
 pub mod knowledge_graph;
 pub mod bmad_integration;
 
+// Phase 4 Advanced Features Commands
+pub mod ml_commands;
+pub mod mobile_commands;
+pub mod advanced_analytics;
+
 pub use api_management::*;
 pub use research::*;
 pub use config::*;
@@ -35,3 +40,8 @@ pub use quantum_ready::*;
 pub use nlp_engine::*;
 pub use blockchain::*;
 pub use knowledge_graph::*;
+
+// Phase 4 Advanced Features exports
+pub use ml_commands::*;
+pub use mobile_commands::*;
+pub use advanced_analytics::*;

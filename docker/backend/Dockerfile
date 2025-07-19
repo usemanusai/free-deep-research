@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Rust Backend
 # Stage 1: Build dependencies and cache them
-FROM rust:1.70-slim-bullseye AS dependencies
+FROM rust:1.75-slim-bookworm AS dependencies
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -66,12 +66,12 @@ WORKDIR /app/src-tauri
 RUN cargo build --release
 
 # Stage 4: Runtime image
-FROM debian:bullseye-slim AS production
+FROM debian:bookworm-slim AS production
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
-    libssl1.1 \
+    libssl3 \
     libpq5 \
     libsqlite3-0 \
     curl \
