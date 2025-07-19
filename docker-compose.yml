@@ -1,0 +1,248 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for production
+  database:
+    image: postgres:15-alpine
+    container_name: fdr-database
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-free_deep_research}
+      POSTGRES_USER: ${DB_USER:-fdr_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password_change_me}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/database/init:/docker-entrypoint-initdb.d
+      - ./docker/database/backups:/backups
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - fdr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fdr_user} -d ${DB_NAME:-free_deep_research}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: fdr-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password_change_me}
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - fdr-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Rust Backend API Server
+  backend:
+    build:
+      context: ./bmad-agent/free-deep-research
+      dockerfile: ../../docker/backend/Dockerfile
+      target: production
+    container_name: fdr-backend
+    restart: unless-stopped
+    environment:
+      - RUST_ENV=${RUST_ENV:-production}
+      - RUST_LOG=${RUST_LOG:-info}
+      - DATABASE_URL=postgresql://${DB_USER:-fdr_user}:${DB_PASSWORD:-secure_password_change_me}@database:5432/${DB_NAME:-free_deep_research}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379
+      - JWT_SECRET=${JWT_SECRET:-jwt_secret_key_change_me}
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,https://localhost:3000}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - SERPAPI_KEY=${SERPAPI_KEY}
+      - JINA_API_KEY=${JINA_API_KEY}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - EXA_API_KEY=${EXA_API_KEY}
+    volumes:
+      - ./docker/backend/logs:/app/logs
+      - ./docker/backend/uploads:/app/uploads
+      - ./docker/backend/cache:/app/cache
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    networks:
+      - fdr-network
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./bmad-agent/deep_research_frontend
+      dockerfile: ../../docker/frontend/Dockerfile
+      target: production
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8080}
+        - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8080}
+        - REACT_APP_VERSION=3.0.0
+        - REACT_APP_BUILD_DATE=${BUILD_DATE:-2025-07-19}
+    container_name: fdr-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./docker/frontend/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/frontend/logs:/var/log/nginx
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - fdr-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: fdr-nginx
+    restart: unless-stopped
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - ./docker/nginx/logs:/var/log/nginx
+      - ./docker/nginx/html:/usr/share/nginx/html:ro
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    networks:
+      - fdr-network
+    depends_on:
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/nginx-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+
+  # Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: fdr-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - fdr-network
+    profiles:
+      - monitoring
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: fdr-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin_password_change_me}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - fdr-network
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  fdr-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
