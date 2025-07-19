@@ -1,0 +1,238 @@
+{
+  "version": "1.0.0",
+  "description": "Comprehensive Dependency Management Configuration for free-deep-research project",
+  
+  "modes": {
+    "conservative": {
+      "description": "Only allow patch and minor version updates",
+      "allowMajorUpdates": false,
+      "allowPrerelease": false,
+      "securityUpdatesOnly": false,
+      "autoFix": false
+    },
+    "aggressive": {
+      "description": "Allow all updates including major versions",
+      "allowMajorUpdates": true,
+      "allowPrerelease": false,
+      "securityUpdatesOnly": false,
+      "autoFix": true
+    },
+    "security-only": {
+      "description": "Only apply security-related updates",
+      "allowMajorUpdates": false,
+      "allowPrerelease": false,
+      "securityUpdatesOnly": true,
+      "autoFix": true
+    }
+  },
+
+  "registries": {
+    "npm": {
+      "primary": "https://registry.npmjs.org",
+      "fallbacks": [
+        "https://registry.yarnpkg.com",
+        "https://npm.pkg.github.com"
+      ],
+      "timeout": 30000,
+      "retries": 3
+    },
+    "cargo": {
+      "primary": "https://crates.io/api/v1",
+      "fallbacks": [],
+      "timeout": 30000,
+      "retries": 3
+    },
+    "pip": {
+      "primary": "https://pypi.org/pypi",
+      "fallbacks": [
+        "https://pypi.python.org/pypi"
+      ],
+      "timeout": 30000,
+      "retries": 3
+    }
+  },
+
+  "packageManagers": {
+    "npm": {
+      "lockFile": "package-lock.json",
+      "installCommand": "npm install",
+      "auditCommand": "npm audit",
+      "outdatedCommand": "npm outdated",
+      "updateCommand": "npm update"
+    },
+    "yarn": {
+      "lockFile": "yarn.lock",
+      "installCommand": "yarn install",
+      "auditCommand": "yarn audit",
+      "outdatedCommand": "yarn outdated",
+      "updateCommand": "yarn upgrade"
+    },
+    "pnpm": {
+      "lockFile": "pnpm-lock.yaml",
+      "installCommand": "pnpm install",
+      "auditCommand": "pnpm audit",
+      "outdatedCommand": "pnpm outdated",
+      "updateCommand": "pnpm update"
+    },
+    "cargo": {
+      "lockFile": "Cargo.lock",
+      "installCommand": "cargo build",
+      "auditCommand": "cargo audit",
+      "outdatedCommand": "cargo outdated",
+      "updateCommand": "cargo update"
+    }
+  },
+
+  "excludePackages": {
+    "npm": [
+      "@types/node",
+      "typescript"
+    ],
+    "cargo": [
+      "serde"
+    ],
+    "description": "Packages to exclude from automatic updates due to breaking changes or stability requirements"
+  },
+
+  "securitySources": {
+    "npm": [
+      "https://registry.npmjs.org/-/npm/v1/security/audits",
+      "https://github.com/advisories"
+    ],
+    "cargo": [
+      "https://rustsec.org/advisories"
+    ]
+  },
+
+  "notifications": {
+    "enabled": true,
+    "channels": {
+      "console": {
+        "enabled": true,
+        "level": "info"
+      },
+      "file": {
+        "enabled": true,
+        "path": "reports/dependency-notifications.log",
+        "level": "warning"
+      },
+      "slack": {
+        "enabled": false,
+        "webhook": "",
+        "channel": "#dev-alerts",
+        "level": "error"
+      },
+      "discord": {
+        "enabled": false,
+        "webhook": "",
+        "level": "error"
+      }
+    }
+  },
+
+  "healthChecks": {
+    "enabled": true,
+    "schedule": {
+      "startup": true,
+      "preCommit": true,
+      "daily": true,
+      "weekly": true
+    },
+    "checks": {
+      "packageFiles": true,
+      "lockFiles": true,
+      "dependencyTree": true,
+      "securityVulnerabilities": true,
+      "outdatedPackages": true,
+      "systemDependencies": true,
+      "diskSpace": true,
+      "networkConnectivity": true
+    },
+    "thresholds": {
+      "diskUsageWarning": 80,
+      "diskUsageCritical": 90,
+      "vulnerabilityWarning": 1,
+      "vulnerabilityCritical": 5,
+      "outdatedPackagesWarning": 10,
+      "outdatedPackagesCritical": 25
+    }
+  },
+
+  "backup": {
+    "enabled": true,
+    "directory": ".dependency-backups",
+    "retentionDays": 30,
+    "compression": false,
+    "includeNodeModules": false
+  },
+
+  "reporting": {
+    "enabled": true,
+    "directory": "reports",
+    "formats": ["json", "html", "markdown"],
+    "includeDetails": true,
+    "includeRecommendations": true,
+    "includeMetrics": true
+  },
+
+  "integration": {
+    "git": {
+      "preCommitHook": true,
+      "prePushHook": false,
+      "commitMessageTemplate": "deps: {action} {packages}"
+    },
+    "ci": {
+      "githubActions": true,
+      "jenkins": false,
+      "gitlab": false
+    },
+    "docker": {
+      "healthCheck": true,
+      "buildTimeCheck": true,
+      "runtimeCheck": false
+    }
+  },
+
+  "performance": {
+    "parallelChecks": true,
+    "maxConcurrency": 5,
+    "cacheEnabled": true,
+    "cacheTTL": 3600,
+    "timeoutMs": 30000
+  },
+
+  "experimental": {
+    "aiRecommendations": false,
+    "predictiveUpdates": false,
+    "smartConflictResolution": true,
+    "dependencyGraphAnalysis": true
+  },
+
+  "projectSpecific": {
+    "free-deep-research": {
+      "criticalPackages": [
+        "@tauri-apps/api",
+        "@tauri-apps/cli",
+        "react",
+        "react-dom",
+        "vite"
+      ],
+      "testCommand": "npm run test",
+      "buildCommand": "npm run build",
+      "devCommand": "npm run dev",
+      "customChecks": [
+        {
+          "name": "tauri-compatibility",
+          "command": "tauri info",
+          "description": "Verify Tauri environment compatibility"
+        },
+        {
+          "name": "rust-compilation",
+          "command": "cargo check",
+          "description": "Verify Rust code compiles successfully",
+          "directory": "src-tauri"
+        }
+      ]
+    }
+  }
+}

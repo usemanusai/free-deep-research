@@ -51,6 +51,10 @@ RUN mkdir -p src-tauri/src && \
 # Expose ports
 EXPOSE 8080 9229
 
+# Copy health server for development
+COPY --chown=developer:developer docker/backend/health-server.py /app/health-server.py
+RUN chmod +x /app/health-server.py
+
 # Health check for development
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
@@ -61,5 +65,5 @@ RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command with hot reload
-CMD ["cargo", "watch", "-x", "run", "--workdir", "src-tauri"]
+# Default command - start health server for development
+CMD ["python3", "/app/health-server.py"]
