@@ -1,7 +1,7 @@
 {
   "name": "deep-research-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "3.0.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

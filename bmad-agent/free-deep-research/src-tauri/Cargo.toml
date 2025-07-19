@@ -1,6 +1,6 @@
 [package]
 name = "free-deep-research-system"
-version = "1.0.0"
+version = "3.0.0"
 description = "Enterprise-grade deep research system operating entirely on free service tiers"
 authors = ["BMAD AI Agent Team"]
 license = "MIT"
@@ -142,6 +142,31 @@ x25519-dalek = "2.0"
 prometheus = "0.13"
 opentelemetry = "0.21"
 jaeger = "0.20"
+
+# V3.0.0 Dependencies - Global Intelligence Network
+# Post-quantum cryptography
+pqcrypto = "0.17"
+pqcrypto-kyber = "0.7"
+pqcrypto-dilithium = "0.5"
+
+# Blockchain and distributed ledger
+substrate-lite = "0.1"
+merkle = "2.0"
+blake3 = "1.5"
+
+# Advanced NLP and ML
+candle-transformers = "0.3"
+tokenizers = "0.15"
+hf-hub = "0.3"
+
+# Knowledge graph and graph processing
+neo4j = "0.6"
+graph-rs = "0.2"
+
+# Federated systems and networking
+libp2p = "0.53"
+multiaddr = "0.18"
+prost-build = "0.12"
 
 [features]
 # by default Tauri runs in production mode
