@@ -12,6 +12,7 @@ pub mod output_processor;
 pub mod analytics;
 pub mod collaboration;
 pub mod mobile_api;
+pub mod performance;
 
 // V1.2.0 Services
 pub mod plugin_system;
@@ -24,6 +25,7 @@ pub mod enterprise;
 pub mod distributed;
 pub mod ai_orchestration;
 pub mod realtime_collaboration;
+pub mod bmad_integration;
 
 // V3.0.0 Services - Global Intelligence Network
 pub mod federated_research;
@@ -44,6 +46,7 @@ use output_processor::OutputProcessorService;
 use analytics::AnalyticsService;
 use collaboration::CollaborationService;
 use mobile_api::MobileApiService;
+use performance::PerformanceService;
 
 // V1.2.0 Services
 use plugin_system::PluginSystemService;
@@ -56,6 +59,7 @@ use enterprise::EnterpriseService;
 use distributed::DistributedService;
 use ai_orchestration::AIOrchestrationService;
 use realtime_collaboration::RealtimeCollaborationService;
+use bmad_integration::BMadIntegrationService;
 
 // V3.0.0 Services
 use federated_research::FederatedResearchService;
@@ -78,6 +82,7 @@ pub struct ServiceManager {
     pub analytics: Arc<RwLock<AnalyticsService>>,
     pub collaboration: Arc<RwLock<CollaborationService>>,
     pub mobile_api: Arc<RwLock<MobileApiService>>,
+    pub performance: Arc<RwLock<PerformanceService>>,
 
     // V1.2.0 Services
     pub plugin_system: Arc<RwLock<PluginSystemService>>,
@@ -90,6 +95,7 @@ pub struct ServiceManager {
     pub distributed: Arc<RwLock<DistributedService>>,
     pub ai_orchestration: Arc<RwLock<AIOrchestrationService>>,
     pub realtime_collaboration: Arc<RwLock<RealtimeCollaborationService>>,
+    pub bmad_integration: Arc<RwLock<BMadIntegrationService>>,
 
     // V3.0.0 Services - Global Intelligence Network
     pub federated_research_service: Arc<RwLock<FederatedResearchService>>,
@@ -185,6 +191,19 @@ impl ServiceManager {
         ).await?;
         let knowledge_graph_service = Arc::new(RwLock::new(knowledge_graph_service));
 
+        // Initialize V2.0.0 services first
+        let ai_orchestration = Arc::new(RwLock::new(AIOrchestrationService::new().await?));
+
+        // Initialize BMAD integration service
+        let bmad_integration = BMadIntegrationService::new(
+            research_engine.clone(),
+            ai_orchestration.clone(),
+            api_manager.clone(),
+            data_persistence.clone(),
+            None, // Use default config
+        ).await?;
+        let bmad_integration = Arc::new(RwLock::new(bmad_integration));
+
         let service_manager = Self {
             api_manager,
             research_engine,
@@ -197,14 +216,16 @@ impl ServiceManager {
             // TODO: Initialize missing services (collaboration, mobile_api, plugin_system, etc.)
             collaboration: Arc::new(RwLock::new(CollaborationService::new().await?)),
             mobile_api: Arc::new(RwLock::new(MobileApiService::new().await?)),
+            performance: Arc::new(RwLock::new(PerformanceService::new().await?)),
             plugin_system: Arc::new(RwLock::new(PluginSystemService::new().await?)),
             workflow_engine: Arc::new(RwLock::new(WorkflowEngineService::new().await?)),
             ml_engine: Arc::new(RwLock::new(MLEngineService::new().await?)),
             cloud_sync: Arc::new(RwLock::new(CloudSyncService::new().await?)),
             enterprise: Arc::new(RwLock::new(EnterpriseService::new().await?)),
             distributed: Arc::new(RwLock::new(DistributedService::new().await?)),
-            ai_orchestration: Arc::new(RwLock::new(AIOrchestrationService::new().await?)),
+            ai_orchestration,
             realtime_collaboration: Arc::new(RwLock::new(RealtimeCollaborationService::new().await?)),
+            bmad_integration,
             // V3.0.0 Services
             federated_research_service,
             ai_marketplace_service,
@@ -357,6 +378,15 @@ impl ServiceManager {
             }
         }
 
+        // Check performance service
+        match self.performance.read().await.health_check().await {
+            Ok(_) => status.performance = ServiceStatus::Healthy,
+            Err(e) => {
+                error!("Performance service health check failed: {}", e);
+                status.performance = ServiceStatus::Unhealthy;
+            }
+        }
+
         Ok(status)
     }
     
@@ -421,6 +451,7 @@ pub struct ServiceHealthStatus {
     pub research_engine: ServiceStatus,
     pub output_processor: ServiceStatus,
     pub analytics: ServiceStatus,
+    pub performance: ServiceStatus,
 }
 
 impl Default for ServiceHealthStatus {
@@ -433,6 +464,7 @@ impl Default for ServiceHealthStatus {
             research_engine: ServiceStatus::Unknown,
             output_processor: ServiceStatus::Unknown,
             analytics: ServiceStatus::Unknown,
+            performance: ServiceStatus::Unknown,
         }
     }
 }
@@ -447,6 +479,7 @@ impl ServiceHealthStatus {
             && matches!(self.research_engine, ServiceStatus::Healthy)
             && matches!(self.output_processor, ServiceStatus::Healthy)
             && matches!(self.analytics, ServiceStatus::Healthy)
+            && matches!(self.performance, ServiceStatus::Healthy)
     }
 }
 

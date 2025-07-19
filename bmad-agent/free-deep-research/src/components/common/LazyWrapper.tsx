@@ -212,6 +212,9 @@ export const lazyComponents = {
   
   // Monitoring components
   MonitoringConsole: lazy(() => import('@/components/monitoring/RealTimeConsole')),
+
+  // BMAD Integration components
+  BMadIntegration: lazy(() => import('@/components/bmad-integration')),
 }
 
 // Preload critical components
@@ -262,6 +265,10 @@ export const routes = {
   Settings: withLazyLoading(
     () => import('@/components/settings/ConfigurationPanel'),
     { displayName: 'Settings' }
+  ),
+  BMadIntegration: withLazyLoading(
+    () => import('@/components/bmad-integration'),
+    { displayName: 'BMadIntegration' }
   )
 }
 

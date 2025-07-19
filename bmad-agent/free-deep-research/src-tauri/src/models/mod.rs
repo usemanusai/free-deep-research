@@ -1,4 +1,5 @@
 pub mod api_key;
+pub mod audit;
 pub mod research_workflow;
 pub mod research_template;
 pub mod configuration;

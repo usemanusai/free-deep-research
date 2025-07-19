@@ -484,11 +484,14 @@ impl WorkflowExecutor for NickScamaraMethodology {
             serde_json::Value::String("openrouter".to_string()),
         ]));
 
+        // Calculate actual word count from content
+        let word_count = content.split_whitespace().count() as u32;
+
         let results = ResearchResults {
             content,
             sources,
             metadata,
-            word_count: 0, // TODO: Calculate actual word count
+            word_count,
             source_count: sources.len() as u32,
             methodology_used: ResearchMethodology::NickScamara,
             execution_time_ms: workflow.execution_duration_ms().unwrap_or(0),

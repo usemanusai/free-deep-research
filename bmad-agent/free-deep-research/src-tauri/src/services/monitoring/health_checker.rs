@@ -135,36 +135,85 @@ impl HealthChecker {
     /// Check API services health
     async fn check_api_services_health(&self) -> ComponentHealth {
         debug!("Checking API services health");
-        
+
         let start_time = std::time::Instant::now();
-        
-        // TODO: Implement actual API services health check
-        // For now, simulate API health check
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-        
-        let response_time = start_time.elapsed().as_millis() as u32;
-        
-        // Simulate API health based on response time
-        let status = if response_time > 5000 {
-            HealthLevel::Critical
-        } else if response_time > 2000 {
+
+        // Define API service endpoints for health checks
+        let api_endpoints = vec![
+            ("OpenRouter", "https://openrouter.ai/api/v1/models"),
+            ("SerpApi", "https://serpapi.com/search"),
+            ("Jina AI", "https://api.jina.ai/v1/models"),
+            ("Firecrawl", "https://api.firecrawl.dev/v0/crawl"),
+            ("Tavily", "https://api.tavily.com/search"),
+            ("Exa AI", "https://api.exa.ai/search"),
+        ];
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .unwrap_or_default();
+
+        let mut healthy_services = 0;
+        let mut total_response_time = 0u64;
+        let total_services = api_endpoints.len();
+
+        // Check each API service
+        for (service_name, endpoint) in &api_endpoints {
+            let service_start = std::time::Instant::now();
+
+            match client.head(*endpoint).send().await {
+                Ok(response) => {
+                    let service_time = service_start.elapsed().as_millis() as u64;
+                    total_response_time += service_time;
+
+                    if response.status().is_success() || response.status().as_u16() == 401 {
+                        // 401 is acceptable as it means the service is responding (just needs auth)
+                        healthy_services += 1;
+                        debug!("Service {} is healthy ({}ms)", service_name, service_time);
+                    } else {
+                        debug!("Service {} returned status: {}", service_name, response.status());
+                    }
+                }
+                Err(e) => {
+                    debug!("Service {} failed: {}", service_name, e);
+                    // Add timeout to total response time for failed services
+                    total_response_time += 5000; // 5 second timeout
+                }
+            }
+        }
+
+        let avg_response_time = if total_services > 0 {
+            (total_response_time / total_services as u64) as u32
+        } else {
+            0
+        };
+
+        let health_percentage = (healthy_services as f64 / total_services as f64) * 100.0;
+
+        let status = if health_percentage >= 80.0 {
+            HealthLevel::Healthy
+        } else if health_percentage >= 50.0 {
             HealthLevel::Warning
         } else {
-            HealthLevel::Healthy
+            HealthLevel::Critical
         };
-        
-        let message = match status {
-            HealthLevel::Healthy => "All API services responding normally".to_string(),
-            HealthLevel::Warning => format!("API services slow ({}ms)", response_time),
-            HealthLevel::Critical => format!("API services critical ({}ms)", response_time),
-            HealthLevel::Unknown => "API services status unknown".to_string(),
-        };
-        
+
+        let message = format!(
+            "{}/{} API services healthy ({:.1}%)",
+            healthy_services,
+            total_services,
+            health_percentage
+        );
+
+        let total_check_time = start_time.elapsed().as_millis() as u32;
+
+        debug!("API services health check completed: {} in {}ms", message, total_check_time);
+
         ComponentHealth {
             status,
             message,
             last_check: Utc::now(),
-            response_time_ms: Some(response_time),
+            response_time_ms: Some(avg_response_time),
         }
     }
     

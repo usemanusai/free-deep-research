@@ -227,6 +227,19 @@ async fn main() {
             analytics::export_analytics_data,
             analytics::get_analytics_health,
 
+            // Performance commands
+            performance::get_performance_metrics,
+            performance::get_optimization_recommendations,
+            performance::clear_performance_caches,
+            performance::get_cache_statistics,
+            performance::get_deduplication_statistics,
+            performance::get_background_processing_statistics,
+            performance::submit_background_task,
+            performance::get_background_task_status,
+            performance::cancel_background_task,
+            performance::get_connection_pool_statistics,
+            performance::performance_health_check,
+
             // V3.0.0 Commands - Global Intelligence Network
             // Federated Research commands
             federated_research::register_federated_organization,
@@ -295,7 +308,19 @@ async fn main() {
             knowledge_graph::get_knowledge_insights,
 
             // Health check
-            health_check
+            health_check,
+
+            // BMAD Integration commands
+            bmad_integration::execute_research_enhanced_documentation_mode,
+            bmad_integration::conduct_agent_research,
+            bmad_integration::get_integration_health_status,
+            bmad_integration::get_research_methodologies,
+            bmad_integration::get_research_types,
+            bmad_integration::get_research_depth_levels,
+            bmad_integration::get_integration_config,
+            bmad_integration::test_bmad_integration,
+            bmad_integration::get_bmad_agents,
+            bmad_integration::get_integration_statistics
         ])
         .setup(|app| {
             info!("Tauri application setup complete");

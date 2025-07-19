@@ -10,7 +10,8 @@ import {
   Bars3Icon,
   XMarkIcon,
   DocumentTextIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline'
 import { clsx } from 'clsx'
 
@@ -24,6 +25,7 @@ const navigation = [
   { name: 'Research', href: '/research', icon: BeakerIcon },
   { name: 'Workflows', href: '/research-dashboard', icon: ClipboardDocumentListIcon },
   { name: 'Templates', href: '/templates', icon: DocumentTextIcon },
+  { name: 'BMAD Integration', href: '/bmad-integration', icon: UserGroupIcon },
   { name: 'Monitoring', href: '/monitoring', icon: ChartBarIcon },
   { name: 'Analytics', href: '/analytics', icon: PresentationChartLineIcon },
   { name: 'Settings', href: '/settings', icon: CogIcon },
