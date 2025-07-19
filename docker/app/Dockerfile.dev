@@ -1,0 +1,195 @@
+# Free Deep Research System - Development Dockerfile
+# Optimized for development with hot reload and debugging capabilities
+
+# =============================================================================
+# BASE STAGE - Node.js with Rust
+# =============================================================================
+FROM node:18-alpine AS base
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    git \
+    python3 \
+    make \
+    g++ \
+    pkgconfig \
+    openssl-dev \
+    musl-dev \
+    && rm -rf /var/cache/apk/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Verify installations
+RUN node --version && npm --version && rustc --version && cargo --version
+
+# =============================================================================
+# DEVELOPMENT STAGE
+# =============================================================================
+FROM base AS development
+
+# Set working directory
+WORKDIR /app
+
+# Create non-root user for development
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup
+
+# Install development tools
+RUN npm install -g nodemon concurrently
+
+# Copy package files
+COPY package*.json ./
+COPY src-tauri/Cargo.toml src-tauri/Cargo.lock ./src-tauri/
+
+# Install Node.js dependencies (including dev dependencies)
+RUN npm ci
+
+# Install Rust dependencies
+WORKDIR /app/src-tauri
+RUN cargo fetch
+WORKDIR /app
+
+# Copy frontend package files
+COPY bmad-agent/deep_research_frontend/package*.json ./bmad-agent/deep_research_frontend/
+RUN cd bmad-agent/deep_research_frontend && npm ci
+
+# Copy source code
+COPY . .
+
+# Set ownership to appuser
+RUN chown -R appuser:appgroup /app
+
+# Switch to non-root user
+USER appuser
+
+# Development environment variables
+ENV NODE_ENV=development
+ENV RUST_ENV=development
+ENV RUST_LOG=debug
+ENV RUST_BACKTRACE=full
+
+# Enable debugging
+ENV NODE_OPTIONS="--inspect=0.0.0.0:9229"
+
+# Expose ports
+EXPOSE 3000 8080 9229
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Development command with hot reload
+CMD ["npm", "run", "dev"]
+
+# =============================================================================
+# FRONTEND DEVELOPMENT STAGE
+# =============================================================================
+FROM base AS frontend-dev
+
+WORKDIR /app
+
+# Copy frontend package files
+COPY bmad-agent/deep_research_frontend/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY bmad-agent/deep_research_frontend/ ./
+
+# Create non-root user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup && \
+    chown -R appuser:appgroup /app
+
+USER appuser
+
+# Development environment
+ENV NODE_ENV=development
+ENV GENERATE_SOURCEMAP=true
+ENV FAST_REFRESH=true
+
+# Expose frontend port
+EXPOSE 3000
+
+# Health check for frontend
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000 || exit 1
+
+# Start development server
+CMD ["npm", "start"]
+
+# =============================================================================
+# BACKEND DEVELOPMENT STAGE
+# =============================================================================
+FROM base AS backend-dev
+
+WORKDIR /app
+
+# Copy Rust package files
+COPY src-tauri/Cargo.toml src-tauri/Cargo.lock ./src-tauri/
+
+# Install Rust dependencies
+WORKDIR /app/src-tauri
+RUN cargo fetch
+
+# Copy backend source
+COPY src-tauri/ ./
+
+# Create non-root user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup && \
+    chown -R appuser:appgroup /app
+
+USER appuser
+
+# Development environment
+ENV RUST_ENV=development
+ENV RUST_LOG=debug
+ENV RUST_BACKTRACE=full
+
+# Expose backend port
+EXPOSE 8080
+
+# Health check for backend
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Start development server with hot reload
+CMD ["cargo", "watch", "-x", "run"]
+
+# =============================================================================
+# TESTING STAGE
+# =============================================================================
+FROM development AS testing
+
+# Install additional testing tools
+USER root
+RUN npm install -g jest playwright
+
+# Install Playwright browsers
+RUN npx playwright install --with-deps
+
+# Switch back to appuser
+USER appuser
+
+# Testing environment
+ENV NODE_ENV=test
+ENV RUST_ENV=test
+
+# Run tests
+CMD ["npm", "run", "test"]
+
+# =============================================================================
+# DEVELOPMENT WITH VOLUMES
+# =============================================================================
+FROM development AS dev-with-volumes
+
+# Create volume mount points
+VOLUME ["/app/src", "/app/src-tauri/src", "/app/bmad-agent"]
+
+# Development command with file watching
+CMD ["npm", "run", "dev:watch"]
