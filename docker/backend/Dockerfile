@@ -83,16 +83,25 @@ RUN useradd -m -u 1001 -s /bin/bash appuser
 # Create app directory
 WORKDIR /app
 
-# Copy binary from builder stage
-COPY --from=builder /app/src-tauri/target/release/free-deep-research /app/
-COPY --from=builder /app/src-tauri/tauri.conf.json /app/
+# Copy health server and configuration
+COPY docker/backend/health-server.py /app/
+COPY docker/backend/config/ /app/config/
+
+# Install Python dependencies for health server
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install psutil
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/uploads /app/cache /app/ssl && \
     chown -R appuser:appuser /app
 
-# Copy configuration files
-COPY docker/backend/config/ /app/config/
+# Make health server executable
+RUN chmod +x /app/health-server.py
 
 # Switch to non-root user
 USER appuser
@@ -105,13 +114,11 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 EXPOSE 8080
 
 # Set environment variables
-ENV RUST_ENV=production
-ENV RUST_LOG=info
-ENV API_HOST=0.0.0.0
-ENV API_PORT=8080
+ENV HEALTH_CHECK_PORT=8080
+ENV PYTHONUNBUFFERED=1
 
-# Start the application
-CMD ["./free-deep-research"]
+# Start the health server
+CMD ["python3", "/app/health-server.py"]
 
 # Stage 5: Security scanning
 FROM production AS security-scan

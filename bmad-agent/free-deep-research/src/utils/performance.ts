@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import React from 'react'
 
 // Performance monitoring utilities
 export interface PerformanceMetrics {

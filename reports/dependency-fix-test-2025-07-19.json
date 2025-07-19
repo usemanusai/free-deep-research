@@ -1,0 +1,93 @@
+{
+  "timestamp": "2025-07-19T14:03:42.519Z",
+  "tests": [
+    {
+      "name": "Package.json @visx/hierarchy Fix",
+      "status": "passed",
+      "details": {
+        "hierarchyVersion": "^3.12.0",
+        "networkVersion": "^3.12.0"
+      },
+      "issues": []
+    },
+    {
+      "name": "NPM Install Process",
+      "status": "failed",
+      "details": {
+        "bmad-agent/free-deep-research": {
+          "installTime": "22045ms",
+          "status": "success"
+        },
+        "bmad-agent/deep_research_frontend": {
+          "status": "failed",
+          "error": "Command failed: npm ci --silent"
+        }
+      },
+      "issues": [
+        "npm install failed in bmad-agent/deep_research_frontend: Command failed: npm ci --silent"
+      ]
+    },
+    {
+      "name": "Visx Package Registry Availability",
+      "status": "passed",
+      "details": {
+        "@visx/hierarchy": "3.12.0",
+        "@visx/network": "3.12.0"
+      },
+      "issues": []
+    },
+    {
+      "name": "Dependency Tree Integrity",
+      "status": "passed",
+      "details": {
+        "bmad-agent/free-deep-research": {
+          "status": "valid",
+          "packages": 64
+        },
+        "bmad-agent/deep_research_frontend": {
+          "status": "valid",
+          "note": "npm list completed with warnings"
+        }
+      },
+      "issues": []
+    },
+    {
+      "name": "Build Process Verification",
+      "status": "failed",
+      "details": {
+        "bmad-agent/free-deep-research": {
+          "command": "npm run build:frontend",
+          "status": "failed",
+          "error": "Command failed: npm run build:frontend\n✗ Build failed in 800ms\nerror during build:\n[vite:esbuild] Transform failed with 1 error:\n/mnt/persist/workspace/bmad-agent/free-deep-research/src/utils/performance.ts:311:22: ERROR: Expected \">\" but found \"{\"\nfile: /mnt/persist/workspace/bmad-agent/free-deep-research/src/utils/performance.ts:311:22\n\nExpected \">\" but found \"{\"\n309|      }, [])\n310|  \n311|      return <Component {...props} />\n   |                        ^\n312|    }\n313|  \n\n    at failureErrorWithLog (/mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:1465:15)\n    at /mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:734:50\n    at responseCallbacks.<computed> (/mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:601:9)\n    at handleIncomingPacket (/mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:656:12)\n    at Socket.readFromStdout (/mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:579:7)\n    at Socket.emit (node:events:518:28)\n    at addChunk (node:internal/streams/readable:561:12)\n    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)\n    at Readable.push (node:internal/streams/readable:392:5)\n    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)\n"
+        },
+        "bmad-agent/deep_research_frontend": {
+          "command": "npm run build",
+          "status": "failed",
+          "error": "Command failed: npm run build\nsh: 1: vite: not found\n"
+        }
+      },
+      "issues": [
+        "Frontend build failed: Command failed: npm run build:frontend\n✗ Build failed in 800ms\nerror during build:\n[vite:esbuild] Transform failed with 1 error:\n/mnt/persist/workspace/bmad-agent/free-deep-research/src/utils/performance.ts:311:22: ERROR: Expected \">\" but found \"{\"\nfile: /mnt/persist/workspace/bmad-agent/free-deep-research/src/utils/performance.ts:311:22\n\nExpected \">\" but found \"{\"\n309|      }, [])\n310|  \n311|      return <Component {...props} />\n   |                        ^\n312|    }\n313|  \n\n    at failureErrorWithLog (/mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:1465:15)\n    at /mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:734:50\n    at responseCallbacks.<computed> (/mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:601:9)\n    at handleIncomingPacket (/mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:656:12)\n    at Socket.readFromStdout (/mnt/persist/workspace/bmad-agent/free-deep-research/node_modules/esbuild/lib/main.js:579:7)\n    at Socket.emit (node:events:518:28)\n    at addChunk (node:internal/streams/readable:561:12)\n    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)\n    at Readable.push (node:internal/streams/readable:392:5)\n    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)\n",
+        "React frontend build failed: Command failed: npm run build\nsh: 1: vite: not found\n"
+      ]
+    },
+    {
+      "name": "Dependency Manager System",
+      "status": "passed",
+      "details": {
+        "scriptExists": true,
+        "healthCheckRun": true,
+        "output": "\u001b[34m[INFO]\u001b[0m 🚀 Starting Comprehensive Dependency Health Check\n\u001b[34m[INFO]\u001b[0m Mode: conservative\n\u001b[34m[INFO]\u001b[0m Scanning for package files...\n\u001b[32m[SUCCESS]\u001b[0m Found 4 package files\n\u001b[34m[INFO]\u001b..."
+      },
+      "issues": []
+    }
+  ],
+  "overall": "failed",
+  "summary": {
+    "total": 6,
+    "passed": 4,
+    "failed": 2,
+    "errors": 0,
+    "passRate": "66.7%"
+  }
+}
