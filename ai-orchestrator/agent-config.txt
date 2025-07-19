@@ -1,0 +1,206 @@
+==================== START: CONFIGURATION ====================
+# AI Agent Orchestrator Configuration
+# Free Deep Research System Integration
+# Version: 3.0.0
+# Date: 2025-07-19
+
+[system]
+version = "3.0.0"
+name = "Free Deep Research AI Orchestrator"
+description = "BMAD AI Agent System for Research-Enhanced Documentation and Development"
+
+[paths]
+agent_root = "./ai-orchestrator"
+personas = "./ai-orchestrator/resources"
+tasks = "./ai-orchestrator/resources/tasks"
+templates = "./ai-orchestrator/resources/templates"
+checklists = "./ai-orchestrator/resources/checklists"
+knowledge_base = "./ai-orchestrator/resources/knowledge-base"
+
+[integration]
+research_system_enabled = true
+research_api_url = "http://localhost:8080"
+tauri_integration = true
+web_interface = true
+==================== END: CONFIGURATION ====================
+
+==================== START: AGENTS ====================
+[agent.product_manager]
+title = "Product Manager"
+name = "John"
+description = "Research-powered product management with evidence-based PRDs and market validation"
+persona = "personas#pm"
+customize = "Enhanced with deep research capabilities for market analysis and user behavior insights"
+tasks = [
+    "create-prd",
+    "market-analysis",
+    "user-research",
+    "competitive-intelligence"
+]
+
+[agent.technical_architect]
+title = "Technical Architect"
+name = "Fred"
+description = "Research-enhanced technical architecture with evidence-based technology choices"
+persona = "personas#architect"
+customize = "Integrated with research system for technology evaluation and performance benchmarking"
+tasks = [
+    "create-architecture",
+    "technology-evaluation",
+    "security-research",
+    "performance-analysis"
+]
+
+[agent.platform_engineer]
+title = "Platform Engineer"
+name = "Alex"
+description = "Infrastructure and DevOps with research-backed optimization strategies"
+persona = "personas#devops-pe"
+customize = "Enhanced with cost optimization research and infrastructure best practices"
+tasks = [
+    "infrastructure-design",
+    "cost-optimization",
+    "compliance-research",
+    "automation-strategy"
+]
+
+[agent.analyst]
+title = "Research Analyst"
+name = "Mary"
+description = "Deep research specialist for brainstorming, requirements gathering, and project briefs"
+persona = "personas#analyst"
+customize = "Primary research coordinator with access to all research methodologies"
+tasks = [
+    "brainstorming",
+    "deep-research",
+    "project-brief",
+    "requirements-gathering"
+]
+
+[agent.design_architect]
+title = "Design Architect"
+name = "Jane"
+description = "UX/UI design with user research and usability analysis"
+persona = "personas#design-architect"
+customize = "Research-enhanced design decisions with user behavior analysis"
+tasks = [
+    "ux-design",
+    "user-research",
+    "usability-analysis",
+    "design-systems"
+]
+==================== END: AGENTS ====================
+
+==================== START: WORKFLOWS ====================
+[workflow.documentation_mode]
+name = "Research-Enhanced Documentation Mode"
+description = "Generate research-backed PRD, Architecture, and Implementation documents"
+duration = "90-120 minutes"
+cost = "$12-25 per session"
+agents = ["product_manager", "technical_architect", "platform_engineer"]
+deliverables = [
+    "research-enhanced-prd.md",
+    "evidence-based-architecture.md", 
+    "validated-implementation-checklist.md",
+    "research-appendix.md"
+]
+
+[workflow.full_development_mode]
+name = "Complete Development Workflow"
+description = "End-to-end development with AI agent collaboration"
+duration = "Variable"
+agents = ["analyst", "product_manager", "technical_architect", "platform_engineer", "design_architect"]
+deliverables = [
+    "Complete application implementation",
+    "Testing and validation",
+    "Deployment and monitoring"
+]
+==================== END: WORKFLOWS ====================
+
+==================== START: RESEARCH_INTEGRATION ====================
+[research.methodologies]
+don_lim = "Cost-optimized research with 95%+ accuracy"
+nick_scamara = "Professional-grade research with comprehensive analysis"
+hybrid = "Balanced approach combining speed and quality"
+
+[research.services]
+openrouter = "AI model access for analysis and synthesis"
+serpapi = "Search results and web data"
+jina = "Content processing and embeddings"
+firecrawl = "Web scraping and content extraction"
+tavily = "Research-specific search and analysis"
+exa = "Semantic search and knowledge discovery"
+
+[research.quality_gates]
+confidence_score_minimum = 80
+source_diversity_minimum = 70
+evidence_coverage_required = 100
+quality_gates_minimum = 5
+
+[research.cost_optimization]
+free_tier_optimization = true
+intelligent_routing = true
+cost_tracking = true
+budget_alerts = true
+==================== END: RESEARCH_INTEGRATION ====================
+
+==================== START: COMMANDS ====================
+# Available commands for the orchestrator
+
+/help - Show available commands and workflows
+/yolo - Toggle YOLO mode for rapid execution
+/full_yolo - Enhanced YOLO with auto-approval
+/pre_select_agents - Agent selection interface
+/agent-list - Display all available agents
+/exit - Return to base orchestrator
+/doc-out - Output complete document
+/load-{agent} - Switch to specific agent
+/tasks - List available tasks for current agent
+/bmad {query} - Query base BMAD system
+/{agent} {query} - Query specific agent
+/party-mode - Group chat with all agents
+==================== END: COMMANDS ====================
+
+==================== START: TEMPLATES ====================
+[template.prd]
+name = "Product Requirements Document"
+path = "templates/prd-tmpl.md"
+description = "Research-enhanced PRD with market validation"
+
+[template.architecture]
+name = "Technical Architecture Document"
+path = "templates/architecture-tmpl.md"
+description = "Evidence-based architecture with technology research"
+
+[template.infrastructure]
+name = "Infrastructure Architecture"
+path = "templates/infrastructure-architecture-tmpl.md"
+description = "Research-backed infrastructure design"
+
+[template.frontend_architecture]
+name = "Frontend Architecture"
+path = "templates/front-end-architecture-tmpl.md"
+description = "Frontend design with UX research integration"
+==================== END: TEMPLATES ====================
+
+==================== START: CHECKLISTS ====================
+[checklist.pm]
+name = "Product Manager Checklist"
+path = "checklists/pm-checklist.md"
+description = "Comprehensive PM validation checklist"
+
+[checklist.architect]
+name = "Architect Checklist"
+path = "checklists/architect-checklist.md"
+description = "Technical architecture validation"
+
+[checklist.infrastructure]
+name = "Infrastructure Checklist"
+path = "checklists/infrastructure-checklist.md"
+description = "Infrastructure and DevOps validation"
+
+[checklist.story_dod]
+name = "Story Definition of Done"
+path = "checklists/story-dod-checklist.md"
+description = "Story completion criteria"
+==================== END: CHECKLISTS ====================
