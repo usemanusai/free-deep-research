@@ -1,0 +1,315 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # LOAD BALANCER & REVERSE PROXY
+  # =============================================================================
+  
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/prod-nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - prod-network
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # APPLICATION SERVICES
+  # =============================================================================
+  
+  # Main Application (Production)
+  app:
+    image: ${CONTAINER_REGISTRY}/free-deep-research:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile.prod
+      args:
+        - NODE_ENV=production
+        - RUST_ENV=production
+        - BUILD_DATE=${BUILD_DATE}
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      - NODE_ENV=production
+      - RUST_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@database:5432/${DB_NAME}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RUST_LOG=warn
+      - RUST_BACKTRACE=0
+    volumes:
+      - app_data:/app/data
+      - app_logs:/app/logs
+    depends_on:
+      - database
+      - redis
+    restart: unless-stopped
+    networks:
+      - prod-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =============================================================================
+  # DATABASE SERVICES
+  # =============================================================================
+  
+  # PostgreSQL Database (Production)
+  database:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backups:/backups
+      - ./docker/database/prod-config.conf:/etc/postgresql/postgresql.conf
+      - ./docker/database/init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - prod-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis Cache (Production)
+  redis:
+    image: redis:7-alpine
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/prod-redis.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    networks:
+      - prod-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # =============================================================================
+  # MONITORING SERVICES
+  # =============================================================================
+  
+  # Prometheus (Metrics Collection)
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/monitoring/prometheus-prod.yml:/etc/prometheus/prometheus.yml
+      - ./docker/monitoring/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    restart: unless-stopped
+    networks:
+      - prod-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Grafana (Metrics Visualization)
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource,grafana-piechart-panel
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./docker/monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - prod-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Alert Manager
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./docker/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    restart: unless-stopped
+    networks:
+      - prod-network
+
+  # =============================================================================
+  # BACKUP SERVICES
+  # =============================================================================
+  
+  # Database Backup
+  db-backup:
+    image: postgres:15-alpine
+    environment:
+      - PGPASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_backups:/backups
+      - ./docker/backup/backup-script.sh:/backup-script.sh
+    depends_on:
+      - database
+    restart: "no"
+    networks:
+      - prod-network
+    profiles:
+      - backup
+    command: ["/backup-script.sh"]
+
+  # File Backup
+  file-backup:
+    image: alpine:latest
+    volumes:
+      - app_data:/source/app_data:ro
+      - app_logs:/source/app_logs:ro
+      - ./backups:/backups
+      - ./docker/backup/file-backup.sh:/file-backup.sh
+    restart: "no"
+    profiles:
+      - backup
+    command: ["/file-backup.sh"]
+
+  # =============================================================================
+  # SECURITY SERVICES
+  # =============================================================================
+  
+  # Fail2Ban (Intrusion Prevention)
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    environment:
+      - TZ=UTC
+      - F2B_LOG_LEVEL=INFO
+    volumes:
+      - ./docker/security/fail2ban:/data
+      - nginx_logs:/var/log/nginx:ro
+      - app_logs:/var/log/app:ro
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    restart: unless-stopped
+    networks:
+      - prod-network
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  postgres_backups:
+    driver: local
+  redis_data:
+    driver: local
+  app_data:
+    driver: local
+  app_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  prod-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+# =============================================================================
+# SECRETS (Docker Swarm)
+# =============================================================================
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  encryption_key:
+    file: ./secrets/encryption_key.txt

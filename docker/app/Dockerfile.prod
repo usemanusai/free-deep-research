@@ -1,0 +1,226 @@
+# Free Deep Research System - Production Dockerfile
+# Multi-stage build optimized for production deployment
+
+# =============================================================================
+# BASE STAGE - Node.js with Rust
+# =============================================================================
+FROM node:18-alpine AS base
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    git \
+    python3 \
+    make \
+    g++ \
+    pkgconfig \
+    openssl-dev \
+    musl-dev \
+    ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# =============================================================================
+# FRONTEND BUILD STAGE
+# =============================================================================
+FROM base AS frontend-builder
+
+WORKDIR /app
+
+# Copy frontend package files
+COPY bmad-agent/deep_research_frontend/package*.json ./
+
+# Install dependencies (production only)
+RUN npm ci --only=production
+
+# Copy frontend source
+COPY bmad-agent/deep_research_frontend/ ./
+
+# Build frontend for production
+ENV NODE_ENV=production
+ENV GENERATE_SOURCEMAP=false
+RUN npm run build
+
+# =============================================================================
+# BACKEND BUILD STAGE
+# =============================================================================
+FROM base AS backend-builder
+
+WORKDIR /app
+
+# Copy Rust package files
+COPY src-tauri/Cargo.toml src-tauri/Cargo.lock ./src-tauri/
+
+# Install Rust dependencies
+WORKDIR /app/src-tauri
+RUN cargo fetch
+
+# Copy backend source
+COPY src-tauri/ ./
+
+# Build backend for production
+ENV RUST_ENV=production
+RUN cargo build --release
+
+# =============================================================================
+# MAIN APP BUILD STAGE
+# =============================================================================
+FROM base AS app-builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies (production only)
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY . .
+
+# Copy built frontend from frontend-builder
+COPY --from=frontend-builder /app/dist ./bmad-agent/deep_research_frontend/dist
+
+# Copy built backend from backend-builder
+COPY --from=backend-builder /app/target/release ./src-tauri/target/release
+
+# Build main application
+ENV NODE_ENV=production
+RUN npm run build
+
+# =============================================================================
+# PRODUCTION STAGE
+# =============================================================================
+FROM node:18-alpine AS production
+
+# Install runtime dependencies only
+RUN apk add --no-cache \
+    curl \
+    dumb-init \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup
+
+# Set working directory
+WORKDIR /app
+
+# Copy built application from app-builder
+COPY --from=app-builder --chown=appuser:appgroup /app/dist ./dist
+COPY --from=app-builder --chown=appuser:appgroup /app/node_modules ./node_modules
+COPY --from=app-builder --chown=appuser:appgroup /app/package*.json ./
+COPY --from=app-builder --chown=appuser:appgroup /app/src-tauri/target/release ./bin
+
+# Copy configuration files
+COPY --chown=appuser:appgroup docker/app/prod-config.json ./config/
+COPY --chown=appuser:appgroup bmad-agent/ ./bmad-agent/
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/uploads /app/cache && \
+    chown -R appuser:appgroup /app
+
+# Switch to non-root user
+USER appuser
+
+# Production environment variables
+ENV NODE_ENV=production
+ENV RUST_ENV=production
+ENV RUST_LOG=warn
+ENV RUST_BACKTRACE=0
+
+# Security settings
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+
+# Expose ports
+EXPOSE 3000 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start application
+CMD ["node", "dist/server.js"]
+
+# =============================================================================
+# NGINX STAGE (Static Assets)
+# =============================================================================
+FROM nginx:alpine AS nginx-static
+
+# Copy built frontend assets
+COPY --from=frontend-builder /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY docker/nginx/static-nginx.conf /etc/nginx/nginx.conf
+
+# Create non-root user for nginx
+RUN addgroup -g 1001 -S nginx && \
+    adduser -S nginx -u 1001 -G nginx
+
+# Set ownership
+RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx
+
+# Switch to non-root user
+USER nginx
+
+# Expose port
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/ || exit 1
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
+
+# =============================================================================
+# MINIMAL PRODUCTION STAGE
+# =============================================================================
+FROM alpine:latest AS minimal
+
+# Install minimal runtime dependencies
+RUN apk add --no-cache \
+    nodejs \
+    npm \
+    curl \
+    dumb-init \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup
+
+WORKDIR /app
+
+# Copy only essential files
+COPY --from=app-builder --chown=appuser:appgroup /app/dist ./
+COPY --from=app-builder --chown=appuser:appgroup /app/node_modules ./node_modules
+COPY --from=app-builder --chown=appuser:appgroup /app/package.json ./
+
+# Create data directory
+RUN mkdir -p /app/data && chown appuser:appgroup /app/data
+
+USER appuser
+
+# Minimal environment
+ENV NODE_ENV=production
+ENV NODE_OPTIONS="--max-old-space-size=512"
+
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=5s --start-period=30s --retries=2 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "server.js"]

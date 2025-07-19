@@ -1,0 +1,96 @@
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "allowJs": true,
+    "checkJs": false,
+    "jsx": "react-jsx",
+
+    /* Bundler mode */
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": true,
+
+    /* Module Resolution */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/types/*": ["src/types/*"],
+      "@/utils/*": ["src/utils/*"],
+      "@/services/*": ["src/services/*"],
+      "@/middleware/*": ["src/middleware/*"],
+      "@/routes/*": ["src/routes/*"],
+      "@/models/*": ["src/models/*"],
+      "@/config/*": ["src/config/*"],
+      "@/bmad/*": ["bmad-agent/*"]
+    },
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+
+    /* Emit */
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    /* Interop Constraints */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Type Checking */
+    "exactOptionalPropertyTypes": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+
+    /* Completeness */
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true
+  },
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "scripts/**/*",
+    "bmad-agent/**/*.ts",
+    "bmad-agent/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "bmad-agent/free-deep-research/src-tauri",
+    "bmad-agent/deep_research_frontend/node_modules",
+    "bmad-agent/deep_research_frontend/build",
+    "docker",
+    "docs"
+  ],
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  }
+}

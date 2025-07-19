@@ -1,0 +1,204 @@
+# BMAD AI Agent Configuration
+# Version: 3.0.0
+# Last Updated: 2025-07-19
+
+# =============================================================================
+# AGENT DEFINITIONS
+# =============================================================================
+
+[agent:product-manager]
+name = John
+title = Product Manager AI
+description = Expert in product strategy, requirements gathering, and market analysis
+persona = personas#pm
+tasks = [create-prd, market-analysis, user-stories, feature-roadmap]
+templates = [prd-template, user-story-template, market-analysis-template]
+checklists = [prd-checklist, product-launch-checklist]
+data = [market-data, user-research]
+customize = Focus on user-centric product development and data-driven decisions
+
+[agent:research-architect]
+name = Fred
+title = Research Architect AI
+description = Expert in technical architecture, system design, and research methodology
+persona = personas#architect
+tasks = [create-architecture, technical-analysis, system-design, research-methodology]
+templates = [architecture-template, technical-spec-template, research-plan-template]
+checklists = [architecture-checklist, technical-review-checklist]
+data = [technical-standards, architecture-patterns]
+customize = Emphasize scalable, maintainable, and secure system designs
+
+[agent:data-analyst]
+name = Dakota
+title = Data Analyst AI
+description = Expert in data analysis, statistical research, and metrics interpretation
+persona = personas#analyst
+tasks = [data-analysis, statistical-research, metrics-interpretation, trend-analysis]
+templates = [analysis-template, report-template, dashboard-template]
+checklists = [data-quality-checklist, analysis-checklist]
+data = [statistical-methods, data-sources]
+customize = Focus on actionable insights and evidence-based recommendations
+
+[agent:design-architect]
+name = Jane
+title = Design Architect AI
+description = Expert in UX/UI design, user research, and design systems
+persona = personas#designer
+tasks = [ux-research, design-system, usability-analysis, interface-design]
+templates = [design-spec-template, user-research-template, wireframe-template]
+checklists = [design-checklist, accessibility-checklist]
+data = [design-principles, usability-guidelines]
+customize = Prioritize user experience and accessibility in all design decisions
+
+[agent:security-engineer]
+name = Sage
+title = Security Engineer AI
+description = Expert in security analysis, compliance, and risk assessment
+persona = personas#security
+tasks = [security-analysis, compliance-review, risk-assessment, threat-modeling]
+templates = [security-assessment-template, compliance-template, risk-matrix-template]
+checklists = [security-checklist, compliance-checklist]
+data = [security-standards, compliance-frameworks]
+customize = Maintain zero-trust security mindset and compliance-first approach
+
+[agent:task-breakdown]
+name = Tyler
+title = Task Breakdown Specialist AI
+description = Expert in project management, task decomposition, and workflow optimization
+persona = personas#pm-specialist
+tasks = [task-breakdown, project-planning, workflow-optimization, resource-allocation]
+templates = [project-plan-template, task-template, workflow-template]
+checklists = [project-checklist, task-completion-checklist]
+data = [project-methodologies, workflow-patterns]
+customize = Focus on clear deliverables and realistic timelines
+
+# =============================================================================
+# WORKFLOW CONFIGURATIONS
+# =============================================================================
+
+[workflow:documentation-mode]
+description = Generate three complete documents ready for developer handoff
+agents = [product-manager, research-architect, task-breakdown]
+outputs = [prd.md, architecture.md, checklist.md]
+quality_gates = [completeness-check, consistency-check, actionability-check]
+collaboration_pattern = sequential
+
+[workflow:full-development]
+description = Complete project development with interactive AI agent collaboration
+agents = [product-manager, research-architect, design-architect, security-engineer, task-breakdown]
+outputs = [dynamic]
+quality_gates = [phase-gate-reviews, cross-validation, stakeholder-approval]
+collaboration_pattern = parallel-with-reviews
+
+# =============================================================================
+# RESOURCE PATHS
+# =============================================================================
+
+[paths]
+personas = bmad-agent/personas
+templates = bmad-agent/templates
+checklists = bmad-agent/checklists
+tasks = bmad-agent/tasks
+data = bmad-agent/data
+outputs = outputs
+
+# =============================================================================
+# QUALITY STANDARDS
+# =============================================================================
+
+[quality]
+minimum_completeness = 0.9
+minimum_accuracy = 0.95
+minimum_consistency = 0.9
+review_threshold = 0.8
+iteration_limit = 5
+
+# =============================================================================
+# COLLABORATION SETTINGS
+# =============================================================================
+
+[collaboration]
+default_mode = interactive
+yolo_mode_enabled = true
+full_yolo_enabled = true
+pre_select_agents_enabled = true
+party_mode_enabled = true
+cross_agent_communication = true
+
+# =============================================================================
+# COMMAND CONFIGURATIONS
+# =============================================================================
+
+[commands]
+help = Show available commands and workflows
+yolo = Toggle YOLO mode for rapid execution
+full_yolo = Enhanced YOLO with auto-approval
+pre_select_agents = Agent selection interface
+agent-list = Display all available agents
+exit = Return to base orchestrator
+doc-out = Output complete document
+load-{agent} = Switch to specific agent
+tasks = List available tasks for current agent
+bmad = Direct communication with base orchestrator
+party-mode = Group chat with all agents
+
+# =============================================================================
+# FEATURE FLAGS
+# =============================================================================
+
+[features]
+multi_agent_collaboration = true
+real_time_validation = true
+template_customization = true
+workflow_branching = true
+quality_assurance = true
+performance_monitoring = true
+audit_logging = true
+
+# =============================================================================
+# INTEGRATION SETTINGS
+# =============================================================================
+
+[integrations]
+research_engine = enabled
+document_generator = enabled
+quality_validator = enabled
+template_engine = enabled
+workflow_orchestrator = enabled
+collaboration_hub = enabled
+
+# =============================================================================
+# PERFORMANCE SETTINGS
+# =============================================================================
+
+[performance]
+max_concurrent_agents = 6
+agent_timeout = 300
+workflow_timeout = 1800
+memory_limit = 2048
+cache_enabled = true
+parallel_processing = true
+
+# =============================================================================
+# SECURITY SETTINGS
+# =============================================================================
+
+[security]
+agent_isolation = true
+data_encryption = true
+audit_trail = true
+access_control = enabled
+secure_communication = true
+privacy_protection = true
+
+# =============================================================================
+# MONITORING SETTINGS
+# =============================================================================
+
+[monitoring]
+performance_tracking = true
+quality_metrics = true
+user_satisfaction = true
+error_reporting = true
+usage_analytics = true
+health_checks = true
