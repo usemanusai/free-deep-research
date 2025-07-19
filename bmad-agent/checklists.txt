@@ -1,0 +1,427 @@
+# BMAD AI Agent Checklists
+# Quality assurance checklists for all agent deliverables
+
+==================== START: prd-checklist ====================
+# Product Requirements Document (PRD) Quality Checklist
+
+## Document Structure and Completeness ✅
+
+### Executive Summary
+- [ ] Product vision clearly stated
+- [ ] Target market identified
+- [ ] Key value proposition articulated
+- [ ] Success metrics defined
+
+### Product Overview
+- [ ] Product description is comprehensive
+- [ ] Target users and personas defined
+- [ ] User needs and pain points identified
+- [ ] Market context and competitive landscape analyzed
+
+### Requirements Definition
+- [ ] Functional requirements are complete
+- [ ] Non-functional requirements specified
+- [ ] User stories follow proper format (As a... I want... So that...)
+- [ ] Acceptance criteria are specific and measurable
+- [ ] Requirements are prioritized (MoSCoW or similar)
+
+### Technical Considerations
+- [ ] Integration requirements identified
+- [ ] Data requirements specified
+- [ ] Platform and infrastructure needs defined
+- [ ] Technical constraints documented
+
+## Quality Standards ✅
+
+### Clarity and Completeness
+- [ ] All requirements are SMART (Specific, Measurable, Achievable, Relevant, Time-bound)
+- [ ] Language is clear and unambiguous
+- [ ] Technical jargon is explained or avoided
+- [ ] Document is complete with no TBD items
+
+### Traceability and Consistency
+- [ ] Requirements trace back to business objectives
+- [ ] User stories align with user personas
+- [ ] Success metrics support business goals
+- [ ] Terminology is consistent throughout
+
+### Stakeholder Alignment
+- [ ] Key stakeholders have reviewed and approved
+- [ ] Business value is clearly articulated
+- [ ] User needs are validated with research
+- [ ] Technical feasibility confirmed with engineering
+
+## Validation and Review ✅
+
+### Business Validation
+- [ ] Business objectives are clearly supported
+- [ ] Market opportunity is validated
+- [ ] Competitive differentiation is clear
+- [ ] ROI projections are realistic
+
+### User Validation
+- [ ] User research supports requirements
+- [ ] User personas are based on real data
+- [ ] User journeys are mapped and validated
+- [ ] Accessibility requirements included
+
+### Technical Validation
+- [ ] Technical architecture can support requirements
+- [ ] Performance requirements are achievable
+- [ ] Security requirements are comprehensive
+- [ ] Integration complexity is understood
+
+## Documentation Standards ✅
+
+### Format and Structure
+- [ ] Document follows approved template
+- [ ] Sections are logically organized
+- [ ] Headers and formatting are consistent
+- [ ] Version control information included
+
+### Supporting Materials
+- [ ] Relevant diagrams and wireframes included
+- [ ] User journey maps provided where applicable
+- [ ] Market research data referenced
+- [ ] Technical specifications linked or attached
+
+### Approval and Sign-off
+- [ ] Document version is clearly marked
+- [ ] Review history is documented
+- [ ] Stakeholder approvals obtained
+- [ ] Change management process defined
+
+## Final Quality Check ✅
+
+### Readiness for Development
+- [ ] Development team can start work immediately
+- [ ] All questions and ambiguities resolved
+- [ ] Dependencies and constraints clearly identified
+- [ ] Success criteria are measurable and achievable
+
+### Long-term Maintainability
+- [ ] Document can be easily updated
+- [ ] Requirements can be traced through development
+- [ ] Success metrics can be tracked and measured
+- [ ] Change impact can be assessed
+==================== END: prd-checklist ====================
+
+==================== START: architecture-checklist ====================
+# System Architecture Quality Checklist
+
+## Architecture Design ✅
+
+### High-Level Architecture
+- [ ] System context and boundaries clearly defined
+- [ ] Architecture style is appropriate for requirements
+- [ ] Component responsibilities are well-defined
+- [ ] Interfaces between components are specified
+- [ ] Data flow through system is documented
+
+### Technology Stack
+- [ ] Technology choices are justified
+- [ ] Technology stack supports all requirements
+- [ ] Technology risks are identified and mitigated
+- [ ] Technology roadmap and lifecycle considered
+- [ ] Team expertise with technologies assessed
+
+### Scalability and Performance
+- [ ] Performance requirements are addressed
+- [ ] Scalability strategy is defined
+- [ ] Bottlenecks are identified and addressed
+- [ ] Load balancing and distribution planned
+- [ ] Caching strategy is appropriate
+
+## Quality Attributes ✅
+
+### Security Architecture
+- [ ] Authentication and authorization designed
+- [ ] Data protection and encryption planned
+- [ ] Network security measures defined
+- [ ] Security monitoring and logging included
+- [ ] Compliance requirements addressed
+
+### Reliability and Availability
+- [ ] Fault tolerance mechanisms designed
+- [ ] Disaster recovery procedures planned
+- [ ] Backup and restore strategies defined
+- [ ] Health monitoring and alerting included
+- [ ] SLA requirements can be met
+
+### Maintainability
+- [ ] Code organization promotes maintainability
+- [ ] Separation of concerns is clear
+- [ ] Dependencies are minimized and managed
+- [ ] Testing strategy supports maintenance
+- [ ] Documentation supports ongoing development
+
+## Implementation Planning ✅
+
+### Development Approach
+- [ ] Implementation phases are defined
+- [ ] Development methodology is specified
+- [ ] Team structure and responsibilities clear
+- [ ] Development tools and environment planned
+- [ ] Code quality standards established
+
+### Deployment Strategy
+- [ ] Deployment environments defined
+- [ ] CI/CD pipeline designed
+- [ ] Infrastructure as Code planned
+- [ ] Rollback procedures defined
+- [ ] Blue-green or canary deployment considered
+
+### Data Management
+- [ ] Database design is normalized and optimized
+- [ ] Data migration strategy planned
+- [ ] Data backup and recovery procedures defined
+- [ ] Data retention and archival policies set
+- [ ] Data privacy and compliance addressed
+
+## Validation and Review ✅
+
+### Technical Review
+- [ ] Architecture review conducted with senior engineers
+- [ ] Performance modeling and testing planned
+- [ ] Security review completed
+- [ ] Scalability testing strategy defined
+- [ ] Technology proof-of-concepts completed
+
+### Stakeholder Alignment
+- [ ] Business requirements are fully supported
+- [ ] Non-functional requirements are addressed
+- [ ] Cost implications are understood and approved
+- [ ] Timeline implications are realistic
+- [ ] Risk assessment completed and accepted
+
+### Documentation Quality
+- [ ] Architecture diagrams are clear and accurate
+- [ ] Technical specifications are complete
+- [ ] API documentation is comprehensive
+- [ ] Deployment guides are detailed
+- [ ] Troubleshooting procedures documented
+
+## Final Validation ✅
+
+### Implementation Readiness
+- [ ] Development team understands architecture
+- [ ] All technical questions resolved
+- [ ] Development environment is ready
+- [ ] Required tools and technologies available
+- [ ] Implementation plan is approved
+
+### Long-term Viability
+- [ ] Architecture supports future growth
+- [ ] Technology choices have long-term support
+- [ ] Architecture can evolve with requirements
+- [ ] Knowledge transfer plan in place
+- [ ] Maintenance procedures documented
+==================== END: architecture-checklist ====================
+
+==================== START: security-checklist ====================
+# Security Assessment Quality Checklist
+
+## Threat Modeling ✅
+
+### Asset Identification
+- [ ] All system assets identified and classified
+- [ ] Data flows mapped and documented
+- [ ] Trust boundaries clearly defined
+- [ ] Entry points and attack surface mapped
+- [ ] Asset criticality and value assessed
+
+### Threat Analysis
+- [ ] Threat actors identified and profiled
+- [ ] Attack vectors analyzed and documented
+- [ ] Threat scenarios developed and validated
+- [ ] Impact assessment completed for each threat
+- [ ] Likelihood assessment based on current controls
+
+### Risk Assessment
+- [ ] Risk calculation methodology defined
+- [ ] Risk scores calculated for all threats
+- [ ] Risk tolerance levels established
+- [ ] Risk prioritization completed
+- [ ] Residual risk assessment performed
+
+## Security Controls ✅
+
+### Preventive Controls
+- [ ] Authentication mechanisms implemented
+- [ ] Authorization controls defined and tested
+- [ ] Input validation and sanitization implemented
+- [ ] Encryption for data at rest and in transit
+- [ ] Network segmentation and firewalls configured
+
+### Detective Controls
+- [ ] Security monitoring and logging implemented
+- [ ] Intrusion detection systems configured
+- [ ] Vulnerability scanning automated
+- [ ] Security event correlation established
+- [ ] Anomaly detection mechanisms in place
+
+### Responsive Controls
+- [ ] Incident response procedures documented
+- [ ] Incident response team identified and trained
+- [ ] Communication plans established
+- [ ] Recovery procedures tested
+- [ ] Lessons learned process defined
+
+## Compliance and Governance ✅
+
+### Regulatory Compliance
+- [ ] Applicable regulations identified (GDPR, CCPA, etc.)
+- [ ] Compliance requirements mapped to controls
+- [ ] Compliance gaps identified and addressed
+- [ ] Compliance monitoring and reporting established
+- [ ] Audit procedures and evidence collection planned
+
+### Security Policies
+- [ ] Security policies documented and approved
+- [ ] Security standards and guidelines established
+- [ ] Security awareness training program defined
+- [ ] Security roles and responsibilities assigned
+- [ ] Security governance structure established
+
+### Risk Management
+- [ ] Risk management framework established
+- [ ] Risk appetite and tolerance defined
+- [ ] Risk monitoring and reporting procedures
+- [ ] Risk treatment plans developed
+- [ ] Risk review and update processes defined
+
+## Testing and Validation ✅
+
+### Security Testing
+- [ ] Penetration testing planned and executed
+- [ ] Vulnerability assessments completed
+- [ ] Security code review performed
+- [ ] Configuration security validated
+- [ ] Social engineering testing considered
+
+### Incident Response Testing
+- [ ] Incident response procedures tested
+- [ ] Communication plans validated
+- [ ] Recovery procedures verified
+- [ ] Team response capabilities assessed
+- [ ] Lessons learned incorporated
+
+### Continuous Monitoring
+- [ ] Security metrics defined and tracked
+- [ ] Security dashboard implemented
+- [ ] Automated alerting configured
+- [ ] Regular security reviews scheduled
+- [ ] Continuous improvement process established
+
+## Documentation and Communication ✅
+
+### Security Documentation
+- [ ] Security architecture documented
+- [ ] Security procedures clearly written
+- [ ] Security configurations documented
+- [ ] Security training materials prepared
+- [ ] Security incident playbooks created
+
+### Stakeholder Communication
+- [ ] Security risks communicated to leadership
+- [ ] Security requirements shared with development
+- [ ] Security awareness training delivered
+- [ ] Security metrics reported regularly
+- [ ] Security incidents communicated appropriately
+==================== END: security-checklist ====================
+
+==================== START: task-completion-checklist ====================
+# Task Completion Quality Checklist
+
+## Task Planning and Setup ✅
+
+### Task Definition
+- [ ] Task objectives clearly defined
+- [ ] Success criteria established
+- [ ] Deliverables specified
+- [ ] Timeline and milestones set
+- [ ] Resources and dependencies identified
+
+### Work Breakdown
+- [ ] Task broken down into manageable subtasks
+- [ ] Dependencies between subtasks identified
+- [ ] Critical path analysis completed
+- [ ] Resource allocation planned
+- [ ] Risk assessment performed
+
+### Quality Planning
+- [ ] Quality standards defined
+- [ ] Review and approval processes established
+- [ ] Testing and validation procedures planned
+- [ ] Acceptance criteria documented
+- [ ] Definition of done established
+
+## Task Execution ✅
+
+### Progress Tracking
+- [ ] Regular progress updates provided
+- [ ] Milestone completion tracked
+- [ ] Issues and blockers identified and escalated
+- [ ] Resource utilization monitored
+- [ ] Quality metrics tracked
+
+### Deliverable Creation
+- [ ] Deliverables meet specified requirements
+- [ ] Quality standards consistently applied
+- [ ] Documentation is complete and accurate
+- [ ] Deliverables are reviewed and approved
+- [ ] Version control and change management followed
+
+### Stakeholder Communication
+- [ ] Regular status updates provided
+- [ ] Stakeholder feedback incorporated
+- [ ] Issues and risks communicated promptly
+- [ ] Decisions documented and communicated
+- [ ] Expectations managed effectively
+
+## Quality Assurance ✅
+
+### Review and Validation
+- [ ] Peer review completed
+- [ ] Quality assurance review passed
+- [ ] Stakeholder review and approval obtained
+- [ ] Testing and validation completed
+- [ ] Acceptance criteria verified
+
+### Documentation
+- [ ] Work performed is fully documented
+- [ ] Decisions and rationale recorded
+- [ ] Lessons learned captured
+- [ ] Knowledge transfer completed
+- [ ] Handover documentation prepared
+
+### Continuous Improvement
+- [ ] Process improvements identified
+- [ ] Best practices documented
+- [ ] Team feedback collected
+- [ ] Metrics analyzed for insights
+- [ ] Recommendations for future tasks provided
+
+## Task Closure ✅
+
+### Deliverable Handover
+- [ ] All deliverables completed and approved
+- [ ] Handover to next phase or team completed
+- [ ] Support and maintenance procedures established
+- [ ] Knowledge transfer completed
+- [ ] Stakeholder sign-off obtained
+
+### Project Closure
+- [ ] Task completion formally documented
+- [ ] Resources released and reassigned
+- [ ] Final metrics and reports generated
+- [ ] Post-task review completed
+- [ ] Success celebration and recognition provided
+
+### Knowledge Management
+- [ ] Lessons learned documented and shared
+- [ ] Best practices updated
+- [ ] Process improvements implemented
+- [ ] Team capabilities and skills updated
+- [ ] Organizational knowledge base updated
+==================== END: task-completion-checklist ====================
