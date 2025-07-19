@@ -1,0 +1,337 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with production optimizations
+  database:
+    image: postgres:15-alpine
+    container_name: fdr-database-prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+      - ./docker/database/init:/docker-entrypoint-initdb.d
+      - ./docker/database/backups:/backups
+      - ./docker/database/postgresql.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - fdr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis with production configuration
+  redis:
+    image: redis:7-alpine
+    container_name: fdr-redis-prod
+    restart: always
+    command: redis-server /usr/local/etc/redis/redis.conf
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis_data_prod:/data
+      - ./docker/redis/redis-prod.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - fdr-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Rust Backend with production optimizations
+  backend:
+    build:
+      context: ./bmad-agent/free-deep-research
+      dockerfile: ../../docker/backend/Dockerfile
+      target: production
+    image: fdr-backend:3.0.0
+    container_name: fdr-backend-prod
+    restart: always
+    environment:
+      - RUST_ENV=production
+      - RUST_LOG=info,fdr=debug
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@database:5432/${DB_NAME}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - SERPAPI_KEY=${SERPAPI_KEY}
+      - JINA_API_KEY=${JINA_API_KEY}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - EXA_API_KEY=${EXA_API_KEY}
+      - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS:-100}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-30}
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-1000}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-3600}
+    volumes:
+      - ./docker/backend/logs:/app/logs
+      - ./docker/backend/uploads:/app/uploads
+      - ./docker/backend/cache:/app/cache
+      - ./docker/backend/ssl:/app/ssl
+    networks:
+      - fdr-network
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+        reservations:
+          memory: 1G
+          cpus: '0.75'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # React Frontend with production build
+  frontend:
+    build:
+      context: ./bmad-agent/deep_research_frontend
+      dockerfile: ../../docker/frontend/Dockerfile
+      target: production
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL}
+        - REACT_APP_WS_URL=${REACT_APP_WS_URL}
+        - REACT_APP_VERSION=3.0.0
+        - REACT_APP_BUILD_DATE=${BUILD_DATE}
+        - REACT_APP_SENTRY_DSN=${SENTRY_DSN}
+    image: fdr-frontend:3.0.0
+    container_name: fdr-frontend-prod
+    restart: always
+    volumes:
+      - ./docker/frontend/nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/frontend/ssl:/etc/nginx/ssl:ro
+    networks:
+      - fdr-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx Load Balancer with SSL
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: fdr-nginx-prod
+    restart: always
+    volumes:
+      - ./docker/nginx/nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - ./docker/nginx/logs:/var/log/nginx
+      - ./docker/nginx/html:/usr/share/nginx/html:ro
+      - ./docker/nginx/cache:/var/cache/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - fdr-network
+    depends_on:
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/nginx-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: fdr-prometheus-prod
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./docker/prometheus/prometheus-prod.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data_prod:/prometheus
+    networks:
+      - fdr-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: fdr-grafana-prod
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+    volumes:
+      - grafana_data_prod:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - fdr-network
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # Log aggregation with Loki
+  loki:
+    image: grafana/loki:2.8.0
+    container_name: fdr-loki-prod
+    restart: always
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data_prod:/loki
+    networks:
+      - fdr-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+
+  # Backup service
+  backup:
+    build:
+      context: ./docker/backup
+      dockerfile: Dockerfile
+    container_name: fdr-backup-prod
+    restart: unless-stopped
+    environment:
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+      - S3_BUCKET=${S3_BACKUP_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - ./docker/database/backups:/backups
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - fdr-network
+    depends_on:
+      - database
+      - redis
+
+volumes:
+  postgres_data_prod:
+    driver: local
+  redis_data_prod:
+    driver: local
+  prometheus_data_prod:
+    driver: local
+  grafana_data_prod:
+    driver: local
+  loki_data_prod:
+    driver: local
+
+networks:
+  fdr-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16

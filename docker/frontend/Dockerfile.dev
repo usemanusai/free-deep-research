@@ -1,0 +1,64 @@
+# Development Dockerfile for React Frontend with hot reload
+FROM node:18-alpine AS development
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git \
+    curl \
+    bash \
+    vim \
+    htop
+
+# Set working directory
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1000 -S appgroup && \
+    adduser -u 1000 -S appuser -G appgroup
+
+# Copy package files
+COPY --chown=appuser:appgroup package*.json ./
+
+# Install dependencies
+RUN npm ci && npm cache clean --force
+
+# Install global development tools
+RUN npm install -g \
+    @storybook/cli \
+    eslint \
+    prettier \
+    typescript
+
+# Change ownership of node_modules
+RUN chown -R appuser:appgroup /app/node_modules
+
+# Switch to non-root user
+USER appuser
+
+# Set development environment variables
+ENV NODE_ENV=development
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
+ENV FAST_REFRESH=true
+ENV REACT_APP_VERSION=3.0.0-dev
+
+# Expose ports
+EXPOSE 3000 24678
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3000 || exit 1
+
+# Development startup script
+COPY --chown=appuser:appgroup docker/frontend/dev-entrypoint.sh /entrypoint.sh
+USER root
+RUN chmod +x /entrypoint.sh
+USER appuser
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Default development command
+CMD ["npm", "start"]

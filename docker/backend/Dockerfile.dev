@@ -1,0 +1,65 @@
+# Development Dockerfile for Rust Backend with hot reload
+FROM rust:1.70-slim-bullseye AS development
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    libsqlite3-dev \
+    curl \
+    build-essential \
+    gdb \
+    valgrind \
+    strace \
+    git \
+    vim \
+    htop \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install development tools
+RUN cargo install cargo-watch cargo-edit cargo-audit cargo-outdated
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user for development
+RUN useradd -m -u 1000 -s /bin/bash developer && \
+    chown -R developer:developer /app /usr/local/cargo
+
+# Switch to developer user
+USER developer
+
+# Set development environment variables
+ENV RUST_ENV=development
+ENV RUST_LOG=debug
+ENV RUST_BACKTRACE=full
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH="/usr/local/cargo/bin:${PATH}"
+
+# Copy dependency files first for better caching
+COPY --chown=developer:developer Cargo.toml Cargo.lock ./
+COPY --chown=developer:developer src-tauri/Cargo.toml ./src-tauri/
+
+# Pre-build dependencies
+RUN mkdir -p src-tauri/src && \
+    echo "fn main() {}" > src-tauri/src/main.rs && \
+    cd src-tauri && \
+    cargo build && \
+    rm -rf src target/debug/deps/free_deep_research*
+
+# Expose ports
+EXPOSE 8080 9229
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Development startup script
+COPY --chown=developer:developer docker/backend/dev-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Default command with hot reload
+CMD ["cargo", "watch", "-x", "run", "--workdir", "src-tauri"]
