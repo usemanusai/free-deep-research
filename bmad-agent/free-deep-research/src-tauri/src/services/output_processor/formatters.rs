@@ -384,3 +384,418 @@ impl OutputFormatter for JSONFormatter {
         "application/json"
     }
 }
+
+/// CSV formatter
+pub struct CSVFormatter;
+
+impl CSVFormatter {
+    pub fn new() -> Self {
+        Self
+    }
+
+    fn format_workflow_as_csv(&self, workflow: &ResearchWorkflow) -> String {
+        let mut csv = String::new();
+
+        // Header
+        csv.push_str("Field,Value\n");
+
+        // Basic workflow info
+        csv.push_str(&format!("Workflow ID,{}\n", workflow.id));
+        csv.push_str(&format!("Name,\"{}\"\n", workflow.name.replace("\"", "\"\"")));
+        csv.push_str(&format!("Query,\"{}\"\n", workflow.query.replace("\"", "\"\"")));
+        csv.push_str(&format!("Status,{:?}\n", workflow.status));
+        csv.push_str(&format!("Created,{}\n", workflow.created_at.format("%Y-%m-%d %H:%M:%S UTC")));
+
+        // Steps
+        csv.push_str("\nStep Name,Step Status,Step Description\n");
+        for step in &workflow.steps {
+            csv.push_str(&format!("\"{}\",{:?},\"{}\"\n",
+                step.name.replace("\"", "\"\""),
+                step.status,
+                step.description.as_deref().unwrap_or("").replace("\"", "\"\"")
+            ));
+        }
+
+        // Results if available
+        if let Some(results) = &workflow.results {
+            csv.push_str("\nResults Section,Content\n");
+            csv.push_str(&format!("Summary,\"{}\"\n", results.summary.replace("\"", "\"\"")));
+
+            for (i, finding) in results.key_findings.iter().enumerate() {
+                csv.push_str(&format!("Key Finding {},\"{}\"\n", i + 1, finding.replace("\"", "\"\"")));
+            }
+        }
+
+        csv
+    }
+}
+
+#[async_trait]
+impl OutputFormatter for CSVFormatter {
+    async fn format(
+        &self,
+        workflow: &ResearchWorkflow,
+        _template: Option<&OutputTemplate>,
+        _options: &OutputOptions,
+    ) -> AppResult<String> {
+        debug!("Formatting workflow {} as CSV", workflow.id);
+        Ok(self.format_workflow_as_csv(workflow))
+    }
+
+    fn file_extension(&self) -> &'static str {
+        "csv"
+    }
+
+    fn mime_type(&self) -> &'static str {
+        "text/csv"
+    }
+}
+
+/// XML formatter
+pub struct XMLFormatter;
+
+impl XMLFormatter {
+    pub fn new() -> Self {
+        Self
+    }
+
+    fn escape_xml(&self, text: &str) -> String {
+        text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&apos;")
+    }
+
+    fn format_workflow_as_xml(&self, workflow: &ResearchWorkflow) -> String {
+        let mut xml = String::new();
+
+        xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        xml.push_str("<research_report>\n");
+
+        // Metadata
+        xml.push_str("  <metadata>\n");
+        xml.push_str(&format!("    <workflow_id>{}</workflow_id>\n", workflow.id));
+        xml.push_str(&format!("    <name>{}</name>\n", self.escape_xml(&workflow.name)));
+        xml.push_str(&format!("    <query>{}</query>\n", self.escape_xml(&workflow.query)));
+        xml.push_str(&format!("    <status>{:?}</status>\n", workflow.status));
+        xml.push_str(&format!("    <created_at>{}</created_at>\n", workflow.created_at.to_rfc3339()));
+        xml.push_str("  </metadata>\n");
+
+        // Steps
+        xml.push_str("  <steps>\n");
+        for step in &workflow.steps {
+            xml.push_str("    <step>\n");
+            xml.push_str(&format!("      <name>{}</name>\n", self.escape_xml(&step.name)));
+            xml.push_str(&format!("      <status>{:?}</status>\n", step.status));
+            if let Some(description) = &step.description {
+                xml.push_str(&format!("      <description>{}</description>\n", self.escape_xml(description)));
+            }
+            xml.push_str("    </step>\n");
+        }
+        xml.push_str("  </steps>\n");
+
+        // Results
+        if let Some(results) = &workflow.results {
+            xml.push_str("  <results>\n");
+            xml.push_str(&format!("    <summary>{}</summary>\n", self.escape_xml(&results.summary)));
+
+            xml.push_str("    <key_findings>\n");
+            for finding in &results.key_findings {
+                xml.push_str(&format!("      <finding>{}</finding>\n", self.escape_xml(finding)));
+            }
+            xml.push_str("    </key_findings>\n");
+            xml.push_str("  </results>\n");
+        }
+
+        xml.push_str("</research_report>\n");
+        xml
+    }
+}
+
+#[async_trait]
+impl OutputFormatter for XMLFormatter {
+    async fn format(
+        &self,
+        workflow: &ResearchWorkflow,
+        _template: Option<&OutputTemplate>,
+        _options: &OutputOptions,
+    ) -> AppResult<String> {
+        debug!("Formatting workflow {} as XML", workflow.id);
+        Ok(self.format_workflow_as_xml(workflow))
+    }
+
+    fn file_extension(&self) -> &'static str {
+        "xml"
+    }
+
+    fn mime_type(&self) -> &'static str {
+        "application/xml"
+    }
+}
+
+/// TXT formatter (plain text)
+pub struct TXTFormatter;
+
+impl TXTFormatter {
+    pub fn new() -> Self {
+        Self
+    }
+
+    fn format_workflow_as_txt(&self, workflow: &ResearchWorkflow, options: &OutputOptions) -> String {
+        let mut txt = String::new();
+
+        if options.include_metadata {
+            txt.push_str(&format!("RESEARCH REPORT: {}\n", workflow.name.to_uppercase()));
+            txt.push_str(&format!("{'=':<60}\n\n"));
+            txt.push_str(&format!("Query: {}\n", workflow.query));
+            txt.push_str(&format!("Status: {:?}\n", workflow.status));
+            txt.push_str(&format!("Created: {}\n\n", workflow.created_at.format("%Y-%m-%d %H:%M:%S UTC")));
+        }
+
+        // Steps
+        txt.push_str("RESEARCH PROCESS\n");
+        txt.push_str(&format!("{:-<60}\n", ""));
+        for (i, step) in workflow.steps.iter().enumerate() {
+            txt.push_str(&format!("{}. {}\n", i + 1, step.name));
+            txt.push_str(&format!("   Status: {:?}\n", step.status));
+            if let Some(description) = &step.description {
+                txt.push_str(&format!("   Description: {}\n", description));
+            }
+            txt.push_str("\n");
+        }
+
+        // Results
+        if let Some(results) = &workflow.results {
+            txt.push_str("EXECUTIVE SUMMARY\n");
+            txt.push_str(&format!("{:-<60}\n", ""));
+            txt.push_str(&format!("{}\n\n", results.summary));
+
+            if !results.key_findings.is_empty() {
+                txt.push_str("KEY FINDINGS\n");
+                txt.push_str(&format!("{:-<60}\n", ""));
+                for (i, finding) in results.key_findings.iter().enumerate() {
+                    txt.push_str(&format!("{}. {}\n", i + 1, finding));
+                }
+                txt.push_str("\n");
+            }
+        }
+
+        txt.push_str(&format!("{:-<60}\n", ""));
+        txt.push_str(&format!("Generated on {} by Research Engine\n", Utc::now().format("%Y-%m-%d %H:%M:%S UTC")));
+
+        txt
+    }
+}
+
+#[async_trait]
+impl OutputFormatter for TXTFormatter {
+    async fn format(
+        &self,
+        workflow: &ResearchWorkflow,
+        _template: Option<&OutputTemplate>,
+        options: &OutputOptions,
+    ) -> AppResult<String> {
+        debug!("Formatting workflow {} as TXT", workflow.id);
+        Ok(self.format_workflow_as_txt(workflow, options))
+    }
+
+    fn file_extension(&self) -> &'static str {
+        "txt"
+    }
+
+    fn mime_type(&self) -> &'static str {
+        "text/plain"
+    }
+}
+
+/// DOCX formatter (Microsoft Word)
+pub struct DOCXFormatter;
+
+impl DOCXFormatter {
+    pub fn new() -> Self {
+        Self
+    }
+
+    fn generate_docx_xml(&self, workflow: &ResearchWorkflow, options: &OutputOptions) -> String {
+        // This is a simplified DOCX representation
+        // In a real implementation, this would generate proper DOCX XML structure
+        let mut docx_xml = String::new();
+
+        docx_xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
+        docx_xml.push_str("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n");
+        docx_xml.push_str("  <w:body>\n");
+
+        if options.include_metadata {
+            // Title
+            docx_xml.push_str("    <w:p>\n");
+            docx_xml.push_str("      <w:pPr><w:pStyle w:val=\"Title\"/></w:pPr>\n");
+            docx_xml.push_str(&format!("      <w:r><w:t>{}</w:t></w:r>\n", workflow.name));
+            docx_xml.push_str("    </w:p>\n");
+
+            // Metadata
+            docx_xml.push_str("    <w:p>\n");
+            docx_xml.push_str(&format!("      <w:r><w:t>Query: {}</w:t></w:r>\n", workflow.query));
+            docx_xml.push_str("    </w:p>\n");
+
+            docx_xml.push_str("    <w:p>\n");
+            docx_xml.push_str(&format!("      <w:r><w:t>Status: {:?}</w:t></w:r>\n", workflow.status));
+            docx_xml.push_str("    </w:p>\n");
+        }
+
+        // Steps
+        docx_xml.push_str("    <w:p>\n");
+        docx_xml.push_str("      <w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr>\n");
+        docx_xml.push_str("      <w:r><w:t>Research Process</w:t></w:r>\n");
+        docx_xml.push_str("    </w:p>\n");
+
+        for step in &workflow.steps {
+            docx_xml.push_str("    <w:p>\n");
+            docx_xml.push_str("      <w:pPr><w:pStyle w:val=\"Heading2\"/></w:pPr>\n");
+            docx_xml.push_str(&format!("      <w:r><w:t>{}</w:t></w:r>\n", step.name));
+            docx_xml.push_str("    </w:p>\n");
+
+            if let Some(description) = &step.description {
+                docx_xml.push_str("    <w:p>\n");
+                docx_xml.push_str(&format!("      <w:r><w:t>{}</w:t></w:r>\n", description));
+                docx_xml.push_str("    </w:p>\n");
+            }
+        }
+
+        // Results
+        if let Some(results) = &workflow.results {
+            docx_xml.push_str("    <w:p>\n");
+            docx_xml.push_str("      <w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr>\n");
+            docx_xml.push_str("      <w:r><w:t>Executive Summary</w:t></w:r>\n");
+            docx_xml.push_str("    </w:p>\n");
+
+            docx_xml.push_str("    <w:p>\n");
+            docx_xml.push_str(&format!("      <w:r><w:t>{}</w:t></w:r>\n", results.summary));
+            docx_xml.push_str("    </w:p>\n");
+        }
+
+        docx_xml.push_str("  </w:body>\n");
+        docx_xml.push_str("</w:document>\n");
+
+        // Mock DOCX representation
+        format!("DOCX_CONTENT_START\n{}\nDOCX_CONTENT_END\n\n<!-- This is a mock DOCX representation. In production, this would be actual DOCX binary data. -->", docx_xml)
+    }
+}
+
+#[async_trait]
+impl OutputFormatter for DOCXFormatter {
+    async fn format(
+        &self,
+        workflow: &ResearchWorkflow,
+        _template: Option<&OutputTemplate>,
+        options: &OutputOptions,
+    ) -> AppResult<String> {
+        debug!("Formatting workflow {} as DOCX", workflow.id);
+        Ok(self.generate_docx_xml(workflow, options))
+    }
+
+    fn file_extension(&self) -> &'static str {
+        "docx"
+    }
+
+    fn mime_type(&self) -> &'static str {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    }
+}
+
+/// PDF formatter using HTML to PDF conversion
+pub struct PDFFormatter {
+    html_formatter: HTMLFormatter,
+}
+
+impl PDFFormatter {
+    pub fn new() -> Self {
+        Self {
+            html_formatter: HTMLFormatter::new(),
+        }
+    }
+
+    /// Generate PDF-optimized HTML content
+    async fn generate_pdf_html(&self, workflow: &ResearchWorkflow, template: Option<&OutputTemplate>, options: &OutputOptions) -> AppResult<String> {
+        // Use the HTML formatter as base
+        let mut html_content = self.html_formatter.format(workflow, template, options).await?;
+
+        // Add PDF-specific styling
+        let pdf_styles = r#"
+        <style>
+            @media print {
+                body { margin: 0.5in; font-size: 12pt; }
+                .page-break { page-break-before: always; }
+                .no-print { display: none; }
+                h1, h2, h3 { page-break-after: avoid; }
+                .step { page-break-inside: avoid; }
+            }
+            body {
+                font-family: 'Times New Roman', serif;
+                line-height: 1.6;
+                color: #333;
+            }
+            .header {
+                border-bottom: 2px solid #333;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+            }
+            .footer {
+                position: fixed;
+                bottom: 0;
+                width: 100%;
+                text-align: center;
+                font-size: 10pt;
+                color: #666;
+            }
+        </style>
+        "#;
+
+        // Insert PDF styles into HTML head
+        if let Some(head_end) = html_content.find("</head>") {
+            html_content.insert_str(head_end, pdf_styles);
+        }
+
+        Ok(html_content)
+    }
+}
+
+#[async_trait]
+impl OutputFormatter for PDFFormatter {
+    async fn format(
+        &self,
+        workflow: &ResearchWorkflow,
+        template: Option<&OutputTemplate>,
+        options: &OutputOptions,
+    ) -> AppResult<String> {
+        debug!("Formatting workflow {} as PDF", workflow.id);
+
+        // Generate PDF-optimized HTML
+        let html_content = self.generate_pdf_html(workflow, template, options).await?;
+
+        // In a real implementation, this would use wkhtmltopdf or similar to convert HTML to PDF
+        // For now, return a mock PDF representation
+        let pdf_mock = format!(
+            "PDF_DOCUMENT_START\n\
+            Content-Type: application/pdf\n\
+            Content-Length: {}\n\
+            Generated: {}\n\n\
+            HTML_SOURCE:\n{}\n\n\
+            PDF_DOCUMENT_END\n\n\
+            <!-- This is a mock PDF representation. In production, this would be converted to actual PDF binary data using wkhtmltopdf or similar. -->",
+            html_content.len(),
+            Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+            html_content
+        );
+
+        Ok(pdf_mock)
+    }
+
+    fn file_extension(&self) -> &'static str {
+        "pdf"
+    }
+
+    fn mime_type(&self) -> &'static str {
+        "application/pdf"
+    }
+}

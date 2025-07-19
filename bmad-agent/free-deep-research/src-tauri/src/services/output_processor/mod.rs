@@ -17,7 +17,7 @@ pub mod visualization;
 pub mod export;
 pub mod analysis;
 
-use self::formatters::{OutputFormatter, MarkdownFormatter, HTMLFormatter, JSONFormatter};
+use self::formatters::{OutputFormatter, MarkdownFormatter, HTMLFormatter, JSONFormatter, PDFFormatter, CSVFormatter, XMLFormatter, TXTFormatter, DOCXFormatter};
 use self::templates::{OutputTemplate, TemplateManager};
 use self::engine::OutputEngine;
 use self::visualization::{VisualizationEngine, VisualizationRequest, ChartType, ChartOutputFormat};
@@ -221,6 +221,11 @@ impl OutputProcessorService {
         formatters.insert(OutputFormat::Markdown, Box::new(MarkdownFormatter::new()));
         formatters.insert(OutputFormat::HTML, Box::new(HTMLFormatter::new()));
         formatters.insert(OutputFormat::JSON, Box::new(JSONFormatter::new()));
+        formatters.insert(OutputFormat::PDF, Box::new(PDFFormatter::new()));
+        formatters.insert(OutputFormat::CSV, Box::new(CSVFormatter::new()));
+        formatters.insert(OutputFormat::XML, Box::new(XMLFormatter::new()));
+        formatters.insert(OutputFormat::TXT, Box::new(TXTFormatter::new()));
+        formatters.insert(OutputFormat::DOCX, Box::new(DOCXFormatter::new()));
 
         let service = Self {
             template_manager,
@@ -610,7 +615,25 @@ impl OutputProcessorService {
 impl Service for OutputProcessorService {
     async fn health_check(&self) -> AppResult<()> {
         debug!("Performing output processor health check");
-        // TODO: Implement actual health check
+
+        // Check template manager health
+        let template_manager = self.template_manager.read().await;
+        if template_manager.get_available_templates().await?.is_empty() {
+            return Err(crate::error::OutputError::template_not_found("No templates available".to_string()).into());
+        }
+        drop(template_manager);
+
+        // Check formatters are available
+        if self.formatters.is_empty() {
+            return Err(crate::error::OutputError::format_error("No formatters available".to_string()).into());
+        }
+
+        // Check export service health
+        let export_service = self.export_service.read().await;
+        // Export service health check would go here
+        drop(export_service);
+
+        debug!("Output processor health check completed successfully");
         Ok(())
     }
 
@@ -622,7 +645,7 @@ impl Service for OutputProcessorService {
 }
 
 // Re-export types for external use
-pub use formatters::{OutputFormatter, MarkdownFormatter, HTMLFormatter, JSONFormatter};
+pub use formatters::{OutputFormatter, MarkdownFormatter, HTMLFormatter, JSONFormatter, PDFFormatter, CSVFormatter, XMLFormatter, TXTFormatter, DOCXFormatter};
 pub use templates::{OutputTemplate, TemplateManager};
 pub use engine::OutputEngine;
 pub use visualization::{

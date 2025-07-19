@@ -112,6 +112,7 @@ function App() {
               <Route path="/templates" element={<routes.Templates />} />
               <Route path="/monitoring" element={<routes.Monitoring />} />
               <Route path="/analytics" element={<routes.Analytics />} />
+              <Route path="/bmad-integration" element={<routes.BMadIntegration />} />
               <Route path="/settings" element={<routes.Settings />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

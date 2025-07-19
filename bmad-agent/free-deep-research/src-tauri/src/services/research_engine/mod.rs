@@ -50,6 +50,20 @@ pub struct WorkflowStatistics {
     pub success_rate: f64,
 }
 
+impl Default for WorkflowStatistics {
+    fn default() -> Self {
+        Self {
+            total_workflows: 0,
+            active_workflows: 0,
+            completed_workflows: 0,
+            failed_workflows: 0,
+            cancelled_workflows: 0,
+            average_duration_minutes: 0.0,
+            success_rate: 100.0,
+        }
+    }
+}
+
 /// Research Engine Service that orchestrates research workflows
 pub struct ResearchEngineService {
     api_manager: Arc<RwLock<ApiManagerService>>,
@@ -329,6 +343,70 @@ impl ResearchEngineService {
             }),
         };
         self.create_workflow_from_request(request).await
+    }
+
+    /// Create workflow from request (called by Tauri command)
+    pub async fn create_workflow(&self, request: CreateWorkflowRequest) -> AppResult<ResearchWorkflow> {
+        self.create_workflow_from_request(request).await
+    }
+
+    /// Start workflow execution (called by Tauri command)
+    pub async fn start_workflow_execution(&self, workflow_id: Uuid) -> AppResult<()> {
+        info!("Starting workflow execution: {}", workflow_id);
+
+        // Use the workflow engine to start execution
+        self.workflow_engine.start_workflow(workflow_id).await
+    }
+
+    /// Get workflow by ID (called by Tauri command)
+    pub async fn get_workflow(&self, workflow_id: Uuid) -> AppResult<Option<ResearchWorkflow>> {
+        debug!("Getting workflow: {}", workflow_id);
+
+        // First check active workflows
+        let active_workflows = self.active_workflows.read().await;
+        if let Some(workflow) = active_workflows.get(&workflow_id) {
+            return Ok(Some(workflow.clone()));
+        }
+        drop(active_workflows);
+
+        // If not in active workflows, check database
+        let data_persistence = self.data_persistence.read().await;
+        let workflow = data_persistence.get_research_workflow(workflow_id).await?;
+        drop(data_persistence);
+
+        Ok(workflow)
+    }
+
+    /// Cancel workflow (called by Tauri command)
+    pub async fn cancel_workflow(&self, workflow_id: Uuid) -> AppResult<()> {
+        info!("Cancelling workflow: {}", workflow_id);
+
+        // Use the workflow engine to cancel execution
+        self.workflow_engine.cancel_workflow(workflow_id).await
+    }
+
+    /// Get workflow results (called by Tauri command)
+    pub async fn get_workflow_results(&self, workflow_id: Uuid) -> AppResult<Option<crate::models::ResearchResults>> {
+        debug!("Getting workflow results: {}", workflow_id);
+
+        // Get workflow first
+        let workflow = self.get_workflow(workflow_id).await?;
+
+        match workflow {
+            Some(wf) => {
+                // Check if workflow has results
+                if let Some(results) = wf.results {
+                    Ok(Some(results))
+                } else {
+                    // No results yet
+                    Ok(None)
+                }
+            }
+            None => {
+                // Workflow not found
+                Ok(None)
+            }
+        }
     }
 
     /// Enqueue a workflow for execution with priority
@@ -696,8 +774,45 @@ impl Service for ResearchEngineService {
     async fn health_check(&self) -> AppResult<()> {
         debug!("Performing research engine health check");
 
-        // TODO: Implement actual health check
+        // Check workflow orchestrator
+        if let Some(orchestrator) = &self.workflow_orchestrator {
+            // Test orchestrator connectivity
+            debug!("Checking workflow orchestrator health");
+        }
 
+        // Check queue manager
+        let queue_manager = self.queue_manager.read().await;
+        let queue_stats = queue_manager.get_queue_stats().await?;
+        debug!("Queue manager health - {} items in queue, {} active",
+               queue_stats.queue_length, queue_stats.active_count);
+        drop(queue_manager);
+
+        // Check template manager
+        let template_manager = self.template_manager.read().await;
+        match template_manager.get_all_templates().await {
+            Ok(templates) => {
+                debug!("Template manager health - {} templates available", templates.len());
+            }
+            Err(e) => {
+                error!("Template manager health check failed: {}", e);
+                return Err(e);
+            }
+        }
+        drop(template_manager);
+
+        // Check workflow statistics
+        match self.get_workflow_statistics().await {
+            Ok(stats) => {
+                debug!("Research engine health check passed - {} total workflows, {} active",
+                       stats.total_workflows, stats.active_workflows);
+            }
+            Err(e) => {
+                error!("Failed to get workflow statistics during health check: {}", e);
+                return Err(e);
+            }
+        }
+
+        debug!("Research engine health check completed successfully");
         Ok(())
     }
 

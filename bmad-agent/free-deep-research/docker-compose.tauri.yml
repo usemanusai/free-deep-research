@@ -1,0 +1,179 @@
+version: '3.8'
+
+# Docker Compose for Tauri Desktop Application Development
+# This setup provides backend services for the Tauri desktop app
+
+services:
+  # SQLite Database for Tauri app (lightweight)
+  database:
+    image: alpine:3.18
+    container_name: fdr-tauri-database
+    restart: unless-stopped
+    command: tail -f /dev/null  # Keep container running
+    volumes:
+      - ./data:/data
+      - ./docker/database/tauri-init.sh:/init.sh
+    networks:
+      - fdr-tauri-network
+    healthcheck:
+      test: ["CMD", "test", "-f", "/data/research.db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Redis for caching (optional for Tauri)
+  redis:
+    image: redis:7-alpine
+    container_name: fdr-tauri-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-tauri_redis_pass}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    networks:
+      - fdr-tauri-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    profiles:
+      - cache
+
+  # External API Mock Server for development/testing
+  api-mock:
+    image: mockserver/mockserver:5.15.0
+    container_name: fdr-api-mock
+    restart: unless-stopped
+    environment:
+      - MOCKSERVER_PROPERTY_FILE=/config/mockserver.properties
+      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/expectations.json
+    volumes:
+      - ./docker/mock-server/config:/config
+      - ./docker/mock-server/expectations.json:/config/expectations.json
+    ports:
+      - "1080:1080"
+    networks:
+      - fdr-tauri-network
+    profiles:
+      - testing
+
+  # Prometheus for metrics (optional)
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: fdr-tauri-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./docker/prometheus/tauri-prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"  # Different port to avoid conflicts
+    networks:
+      - fdr-tauri-network
+    profiles:
+      - monitoring
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: fdr-tauri-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-tauri_grafana_pass}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_HTTP_PORT=3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/tauri-provisioning:/etc/grafana/provisioning
+    ports:
+      - "3002:3000"  # Different port to avoid conflicts
+    networks:
+      - fdr-tauri-network
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+
+  # Development Tools Container
+  dev-tools:
+    image: alpine:3.18
+    container_name: fdr-dev-tools
+    restart: unless-stopped
+    command: tail -f /dev/null
+    volumes:
+      - ./:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    networks:
+      - fdr-tauri-network
+    profiles:
+      - development
+
+  # Test Runner Container
+  test-runner:
+    build:
+      context: .
+      dockerfile: docker/testing/Dockerfile
+    container_name: fdr-test-runner
+    restart: "no"
+    environment:
+      - RUST_ENV=test
+      - RUST_LOG=debug
+      - DATABASE_URL=sqlite:///data/test_research.db
+      - REDIS_URL=redis://:tauri_redis_pass@redis:6379
+    volumes:
+      - ./:/app
+      - ./data:/data
+    networks:
+      - fdr-tauri-network
+    depends_on:
+      - database
+      - redis
+    profiles:
+      - testing
+
+volumes:
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  fdr-tauri-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+# Usage Examples:
+# 
+# Basic development (database only):
+# docker-compose -f docker-compose.tauri.yml up database
+#
+# Development with caching:
+# docker-compose -f docker-compose.tauri.yml --profile cache up
+#
+# Development with monitoring:
+# docker-compose -f docker-compose.tauri.yml --profile monitoring up
+#
+# Testing environment:
+# docker-compose -f docker-compose.tauri.yml --profile testing up
+#
+# Full development environment:
+# docker-compose -f docker-compose.tauri.yml --profile cache --profile monitoring --profile testing up
+#
+# Clean shutdown:
+# docker-compose -f docker-compose.tauri.yml down --volumes

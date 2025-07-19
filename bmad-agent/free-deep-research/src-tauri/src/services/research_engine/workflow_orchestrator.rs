@@ -131,22 +131,10 @@ impl WorkflowOrchestrator {
         
         match step.provider.as_str() {
             "serpapi" => {
-                // TODO: Implement SerpAPI search
-                Ok(serde_json::json!({
-                    "provider": "serpapi",
-                    "query": query,
-                    "results": [],
-                    "message": "SerpAPI search not yet implemented"
-                }))
+                self.execute_serpapi_search(query, num_results).await
             }
             "tavily" => {
-                // TODO: Implement Tavily search
-                Ok(serde_json::json!({
-                    "provider": "tavily",
-                    "query": query,
-                    "results": [],
-                    "message": "Tavily search not yet implemented"
-                }))
+                self.execute_tavily_search(query, num_results).await
             }
             _ => {
                 Err(ResearchError::unsupported_provider(step.provider.clone()).into())
@@ -160,13 +148,7 @@ impl WorkflowOrchestrator {
         
         match step.provider.as_str() {
             "exa" => {
-                // TODO: Implement Exa academic search
-                Ok(serde_json::json!({
-                    "provider": "exa",
-                    "query": query,
-                    "results": [],
-                    "message": "Exa academic search not yet implemented"
-                }))
+                self.execute_exa_search(query, 10).await
             }
             _ => {
                 Err(ResearchError::unsupported_provider(step.provider.clone()).into())
@@ -184,20 +166,10 @@ impl WorkflowOrchestrator {
         
         match step.provider.as_str() {
             "firecrawl" => {
-                // TODO: Implement Firecrawl content extraction
-                Ok(serde_json::json!({
-                    "provider": "firecrawl",
-                    "extracted_content": [],
-                    "message": "Firecrawl content extraction not yet implemented"
-                }))
+                self.execute_firecrawl_extraction(previous_results).await
             }
             "jina" => {
-                // TODO: Implement Jina content extraction
-                Ok(serde_json::json!({
-                    "provider": "jina",
-                    "extracted_content": [],
-                    "message": "Jina content extraction not yet implemented"
-                }))
+                self.execute_jina_processing(previous_results).await
             }
             _ => {
                 Err(ResearchError::unsupported_provider(step.provider.clone()).into())
@@ -308,5 +280,284 @@ impl WorkflowOrchestrator {
                 "timestamp": Utc::now().to_rfc3339()
             }),
         })
+    }
+
+    /// Execute SerpAPI search
+    async fn execute_serpapi_search(&self, query: &str, num_results: u32) -> AppResult<serde_json::Value> {
+        debug!("Executing SerpAPI search for query: {}", query);
+
+        let api_manager = self.api_manager.read().await;
+        let service_request = crate::services::api_manager::service_integration::ServiceRequest {
+            endpoint: "/search".to_string(),
+            method: "GET".to_string(),
+            headers: std::collections::HashMap::new(),
+            body: None,
+            parameters: {
+                let mut params = std::collections::HashMap::new();
+                params.insert("q".to_string(), query.to_string());
+                params.insert("engine".to_string(), "google".to_string());
+                params.insert("num".to_string(), num_results.to_string());
+                params
+            },
+        };
+
+        match api_manager.make_service_request(crate::models::api_key::ServiceProvider::SerpApi, service_request).await {
+            Ok(response) => {
+                debug!("SerpAPI search completed successfully");
+                Ok(serde_json::json!({
+                    "provider": "serpapi",
+                    "query": query,
+                    "results": response.data,
+                    "success": response.success,
+                    "response_time_ms": response.response_time_ms
+                }))
+            }
+            Err(e) => {
+                error!("SerpAPI search failed: {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    /// Execute Tavily search
+    async fn execute_tavily_search(&self, query: &str, num_results: u32) -> AppResult<serde_json::Value> {
+        debug!("Executing Tavily search for query: {}", query);
+
+        let api_manager = self.api_manager.read().await;
+        let request_body = serde_json::json!({
+            "query": query,
+            "search_depth": "basic",
+            "max_results": num_results,
+            "include_images": false,
+            "include_answer": true
+        });
+
+        let service_request = crate::services::api_manager::service_integration::ServiceRequest {
+            endpoint: "/search".to_string(),
+            method: "POST".to_string(),
+            headers: {
+                let mut headers = std::collections::HashMap::new();
+                headers.insert("Content-Type".to_string(), "application/json".to_string());
+                headers
+            },
+            body: Some(request_body.to_string()),
+            parameters: std::collections::HashMap::new(),
+        };
+
+        match api_manager.make_service_request(crate::models::api_key::ServiceProvider::Tavily, service_request).await {
+            Ok(response) => {
+                debug!("Tavily search completed successfully");
+                Ok(serde_json::json!({
+                    "provider": "tavily",
+                    "query": query,
+                    "results": response.data,
+                    "success": response.success,
+                    "response_time_ms": response.response_time_ms
+                }))
+            }
+            Err(e) => {
+                error!("Tavily search failed: {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    /// Execute Exa search
+    async fn execute_exa_search(&self, query: &str, num_results: u32) -> AppResult<serde_json::Value> {
+        debug!("Executing Exa search for query: {}", query);
+
+        let api_manager = self.api_manager.read().await;
+        let request_body = serde_json::json!({
+            "query": query,
+            "numResults": num_results,
+            "useAutoprompt": false
+        });
+
+        let service_request = crate::services::api_manager::service_integration::ServiceRequest {
+            endpoint: "/search".to_string(),
+            method: "POST".to_string(),
+            headers: {
+                let mut headers = std::collections::HashMap::new();
+                headers.insert("Content-Type".to_string(), "application/json".to_string());
+                headers
+            },
+            body: Some(request_body.to_string()),
+            parameters: std::collections::HashMap::new(),
+        };
+
+        match api_manager.make_service_request(crate::models::api_key::ServiceProvider::Exa, service_request).await {
+            Ok(response) => {
+                debug!("Exa search completed successfully");
+                Ok(serde_json::json!({
+                    "provider": "exa",
+                    "query": query,
+                    "results": response.data,
+                    "success": response.success,
+                    "response_time_ms": response.response_time_ms
+                }))
+            }
+            Err(e) => {
+                error!("Exa search failed: {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    /// Execute Firecrawl content extraction
+    async fn execute_firecrawl_extraction(&self, previous_results: &[serde_json::Value]) -> AppResult<serde_json::Value> {
+        debug!("Executing Firecrawl content extraction");
+
+        // Extract URLs from previous search results
+        let urls = self.extract_urls_from_results(previous_results);
+        if urls.is_empty() {
+            return Ok(serde_json::json!({
+                "provider": "firecrawl",
+                "extracted_content": [],
+                "message": "No URLs found in previous results"
+            }));
+        }
+
+        let api_manager = self.api_manager.read().await;
+        let mut extracted_content = Vec::new();
+
+        // Process up to 5 URLs to avoid rate limits
+        for url in urls.iter().take(5) {
+            let request_body = serde_json::json!({
+                "url": url,
+                "formats": ["markdown", "html"],
+                "onlyMainContent": true
+            });
+
+            let service_request = crate::services::api_manager::service_integration::ServiceRequest {
+                endpoint: "/scrape".to_string(),
+                method: "POST".to_string(),
+                headers: {
+                    let mut headers = std::collections::HashMap::new();
+                    headers.insert("Content-Type".to_string(), "application/json".to_string());
+                    headers
+                },
+                body: Some(request_body.to_string()),
+                parameters: std::collections::HashMap::new(),
+            };
+
+            match api_manager.make_service_request(crate::models::api_key::ServiceProvider::Firecrawl, service_request).await {
+                Ok(response) => {
+                    extracted_content.push(serde_json::json!({
+                        "url": url,
+                        "content": response.data,
+                        "success": response.success
+                    }));
+                }
+                Err(e) => {
+                    warn!("Failed to extract content from {}: {}", url, e);
+                    extracted_content.push(serde_json::json!({
+                        "url": url,
+                        "error": e.to_string(),
+                        "success": false
+                    }));
+                }
+            }
+        }
+
+        Ok(serde_json::json!({
+            "provider": "firecrawl",
+            "extracted_content": extracted_content,
+            "urls_processed": urls.len().min(5),
+            "total_urls_found": urls.len()
+        }))
+    }
+
+    /// Execute Jina AI processing
+    async fn execute_jina_processing(&self, previous_results: &[serde_json::Value]) -> AppResult<serde_json::Value> {
+        debug!("Executing Jina AI processing");
+
+        // Extract text content from previous results
+        let text_content = self.extract_text_from_results(previous_results);
+        if text_content.is_empty() {
+            return Ok(serde_json::json!({
+                "provider": "jina",
+                "processed_content": [],
+                "message": "No text content found in previous results"
+            }));
+        }
+
+        let api_manager = self.api_manager.read().await;
+        let request_body = serde_json::json!({
+            "input": text_content,
+            "model": "jina-embeddings-v2-base-en"
+        });
+
+        let service_request = crate::services::api_manager::service_integration::ServiceRequest {
+            endpoint: "/embeddings".to_string(),
+            method: "POST".to_string(),
+            headers: {
+                let mut headers = std::collections::HashMap::new();
+                headers.insert("Content-Type".to_string(), "application/json".to_string());
+                headers
+            },
+            body: Some(request_body.to_string()),
+            parameters: std::collections::HashMap::new(),
+        };
+
+        match api_manager.make_service_request(crate::models::api_key::ServiceProvider::Jina, service_request).await {
+            Ok(response) => {
+                debug!("Jina AI processing completed successfully");
+                Ok(serde_json::json!({
+                    "provider": "jina",
+                    "processed_content": response.data,
+                    "success": response.success,
+                    "response_time_ms": response.response_time_ms,
+                    "input_texts": text_content.len()
+                }))
+            }
+            Err(e) => {
+                error!("Jina AI processing failed: {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    /// Extract URLs from search results
+    fn extract_urls_from_results(&self, results: &[serde_json::Value]) -> Vec<String> {
+        let mut urls = Vec::new();
+
+        for result in results {
+            if let Some(results_array) = result.get("results").and_then(|r| r.as_array()) {
+                for item in results_array {
+                    if let Some(url) = item.get("url").and_then(|u| u.as_str()) {
+                        urls.push(url.to_string());
+                    } else if let Some(link) = item.get("link").and_then(|l| l.as_str()) {
+                        urls.push(link.to_string());
+                    }
+                }
+            }
+        }
+
+        urls
+    }
+
+    /// Extract text content from results
+    fn extract_text_from_results(&self, results: &[serde_json::Value]) -> Vec<String> {
+        let mut text_content = Vec::new();
+
+        for result in results {
+            if let Some(content) = result.get("extracted_content").and_then(|c| c.as_array()) {
+                for item in content {
+                    if let Some(text) = item.get("content").and_then(|t| t.as_str()) {
+                        text_content.push(text.to_string());
+                    }
+                }
+            } else if let Some(results_array) = result.get("results").and_then(|r| r.as_array()) {
+                for item in results_array {
+                    if let Some(snippet) = item.get("snippet").and_then(|s| s.as_str()) {
+                        text_content.push(snippet.to_string());
+                    } else if let Some(content) = item.get("content").and_then(|c| c.as_str()) {
+                        text_content.push(content.to_string());
+                    }
+                }
+            }
+        }
+
+        text_content
     }
 }

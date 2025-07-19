@@ -353,6 +353,26 @@ impl AuditLogger {
         Ok(events)
     }
 
+    /// Get recent error count from audit logs
+    pub async fn get_recent_error_count(&self) -> AppResult<u32> {
+        debug!("Getting recent error count from audit logs");
+
+        if let Some(ref conn) = self.connection {
+            let mut stmt = conn.prepare(
+                "SELECT COUNT(*) FROM audit_logs WHERE severity = 'Critical' OR severity = 'High' AND created_at > datetime('now', '-1 hour')"
+            ).map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+            let count: u32 = stmt.query_row([], |row| row.get(0))
+                .map_err(|e| StorageError::Database { message: e.to_string() })?;
+
+            debug!("Found {} recent errors in audit logs", count);
+            Ok(count)
+        } else {
+            warn!("No database connection available for error count");
+            Ok(0)
+        }
+    }
+
     /// Shutdown the audit logger
     pub async fn shutdown(&self) -> AppResult<()> {
         info!("Shutting down audit logger...");
