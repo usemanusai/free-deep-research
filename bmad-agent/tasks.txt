@@ -1,0 +1,359 @@
+# BMAD AI Agent Tasks
+# Specific task definitions for all AI agents
+
+==================== START: create-prd ====================
+# Create Product Requirements Document Task
+
+## Task Overview
+Create a comprehensive Product Requirements Document (PRD) that serves as the definitive guide for product development, including business objectives, user needs, functional requirements, and success metrics.
+
+## Prerequisites
+- Business objectives clearly defined
+- Target market and user personas identified
+- Competitive landscape analyzed
+- Stakeholder input gathered
+
+## Task Steps
+
+### 1. Discovery and Research
+- Conduct stakeholder interviews to understand business goals
+- Analyze target market and user personas
+- Research competitive landscape and market positioning
+- Gather existing user research and feedback
+- Review business metrics and success criteria
+
+### 2. Requirements Gathering
+- Define functional requirements based on user needs
+- Specify non-functional requirements (performance, security, usability)
+- Create user stories with clear acceptance criteria
+- Prioritize features using MoSCoW or similar framework
+- Identify technical constraints and dependencies
+
+### 3. Documentation Creation
+- Use PRD template as foundation
+- Write clear, concise requirement descriptions
+- Include user journey maps and workflow diagrams
+- Define success metrics and KPIs
+- Create feature prioritization matrix
+
+### 4. Validation and Review
+- Review with key stakeholders for alignment
+- Validate requirements with user research
+- Ensure technical feasibility with engineering team
+- Confirm business value and ROI projections
+- Iterate based on feedback
+
+### 5. Finalization
+- Incorporate all feedback and revisions
+- Ensure document completeness and clarity
+- Obtain formal stakeholder approval
+- Establish change management process
+- Distribute to development team
+
+## Deliverables
+- Complete PRD document following template
+- User story backlog with acceptance criteria
+- Feature prioritization matrix
+- Success metrics dashboard specification
+- Stakeholder sign-off documentation
+
+## Quality Criteria
+- All requirements are SMART (Specific, Measurable, Achievable, Relevant, Time-bound)
+- User stories include clear acceptance criteria
+- Business value is clearly articulated for each feature
+- Technical feasibility has been validated
+- Document is clear and actionable for development team
+
+## Success Metrics
+- Stakeholder approval rating > 90%
+- Development team clarity score > 85%
+- Requirements completeness score > 95%
+- Time to development start < 1 week after approval
+==================== END: create-prd ====================
+
+==================== START: create-architecture ====================
+# Create System Architecture Task
+
+## Task Overview
+Design and document a comprehensive system architecture that meets all functional and non-functional requirements while ensuring scalability, maintainability, and security.
+
+## Prerequisites
+- Product requirements document completed
+- Technical constraints identified
+- Performance and scalability requirements defined
+- Security and compliance requirements understood
+
+## Task Steps
+
+### 1. Requirements Analysis
+- Review PRD and technical requirements
+- Identify system boundaries and interfaces
+- Analyze performance and scalability needs
+- Understand security and compliance requirements
+- Assess existing system constraints
+
+### 2. Architecture Design
+- Design high-level system architecture
+- Define component interactions and data flow
+- Select appropriate technology stack
+- Design database schema and data models
+- Plan API structure and interfaces
+
+### 3. Technology Evaluation
+- Evaluate technology options against requirements
+- Conduct proof-of-concept for critical components
+- Assess performance and scalability implications
+- Consider maintenance and support requirements
+- Document technology decisions and trade-offs
+
+### 4. Security Architecture
+- Design authentication and authorization systems
+- Plan data encryption and protection strategies
+- Implement security monitoring and logging
+- Ensure compliance with regulatory requirements
+- Conduct threat modeling and risk assessment
+
+### 5. Documentation
+- Create comprehensive architecture document
+- Develop deployment and infrastructure plans
+- Document API specifications and interfaces
+- Create database design and migration plans
+- Establish monitoring and observability strategy
+
+## Deliverables
+- System architecture document
+- Technology stack specification
+- Database design and schema
+- API documentation and specifications
+- Security architecture and threat model
+- Deployment and infrastructure plan
+
+## Quality Criteria
+- Architecture supports all functional requirements
+- Non-functional requirements are addressed
+- Technology choices are justified and documented
+- Security is integrated throughout the design
+- Documentation is complete and actionable
+
+## Success Metrics
+- Architecture review approval > 95%
+- Technical feasibility validation > 90%
+- Security review approval > 95%
+- Development team readiness score > 85%
+==================== END: create-architecture ====================
+
+==================== START: task-breakdown ====================
+# Task Breakdown and Project Planning Task
+
+## Task Overview
+Break down complex projects into manageable tasks with clear deliverables, timelines, and dependencies to enable effective project execution and tracking.
+
+## Prerequisites
+- Project scope and objectives defined
+- Requirements and architecture documents available
+- Team composition and capacity known
+- Timeline constraints identified
+
+## Task Steps
+
+### 1. Project Analysis
+- Review project scope and objectives
+- Analyze requirements and architecture documents
+- Identify major project phases and milestones
+- Understand resource constraints and dependencies
+- Assess project risks and mitigation strategies
+
+### 2. Work Breakdown Structure
+- Decompose project into major work packages
+- Break down work packages into specific tasks
+- Define clear deliverables for each task
+- Estimate effort and duration for each task
+- Identify task dependencies and critical path
+
+### 3. Resource Planning
+- Assign tasks to team members based on skills
+- Balance workload across team members
+- Identify resource conflicts and bottlenecks
+- Plan for skill development and knowledge transfer
+- Consider external dependencies and vendors
+
+### 4. Timeline Development
+- Create realistic project timeline
+- Identify critical path and key milestones
+- Build in buffer time for risks and unknowns
+- Align timeline with business requirements
+- Validate timeline with team and stakeholders
+
+### 5. Quality Planning
+- Define acceptance criteria for each deliverable
+- Establish quality gates and review processes
+- Plan testing and validation activities
+- Define definition of done for each task
+- Establish change management procedures
+
+## Deliverables
+- Work breakdown structure (WBS)
+- Detailed project timeline with milestones
+- Resource allocation and capacity plan
+- Risk register with mitigation strategies
+- Quality assurance plan and checklists
+- Project tracking and reporting framework
+
+## Quality Criteria
+- All tasks have clear acceptance criteria
+- Timeline is realistic and achievable
+- Dependencies are identified and managed
+- Resource allocation is balanced and feasible
+- Quality gates are defined for all deliverables
+
+## Success Metrics
+- Project completion within timeline > 90%
+- Budget adherence > 95%
+- Quality gate pass rate > 95%
+- Team satisfaction score > 85%
+- Stakeholder satisfaction score > 90%
+==================== END: task-breakdown ====================
+
+==================== START: security-analysis ====================
+# Security Analysis and Assessment Task
+
+## Task Overview
+Conduct comprehensive security analysis to identify vulnerabilities, assess risks, and implement appropriate security controls to protect the system and data.
+
+## Prerequisites
+- System architecture and design completed
+- Compliance requirements identified
+- Threat landscape analysis available
+- Security policies and standards defined
+
+## Task Steps
+
+### 1. Threat Modeling
+- Identify system assets and data flows
+- Analyze potential threat actors and attack vectors
+- Assess attack surface and entry points
+- Evaluate impact and likelihood of threats
+- Prioritize threats based on risk assessment
+
+### 2. Vulnerability Assessment
+- Conduct automated vulnerability scanning
+- Perform manual security testing
+- Review code for security vulnerabilities
+- Assess configuration and deployment security
+- Evaluate third-party component security
+
+### 3. Risk Analysis
+- Calculate risk scores for identified threats
+- Assess business impact of security incidents
+- Evaluate current security control effectiveness
+- Identify gaps in security coverage
+- Prioritize risks for mitigation
+
+### 4. Security Control Design
+- Design appropriate security controls for each risk
+- Implement defense-in-depth strategy
+- Plan incident response and recovery procedures
+- Establish security monitoring and alerting
+- Design security testing and validation processes
+
+### 5. Compliance Validation
+- Map security controls to compliance requirements
+- Conduct compliance gap analysis
+- Implement required compliance controls
+- Establish compliance monitoring and reporting
+- Prepare for compliance audits
+
+## Deliverables
+- Threat model and risk assessment
+- Vulnerability assessment report
+- Security control implementation plan
+- Incident response procedures
+- Compliance mapping and gap analysis
+- Security monitoring and alerting plan
+
+## Quality Criteria
+- All critical and high risks are addressed
+- Security controls are appropriate and effective
+- Compliance requirements are fully met
+- Incident response procedures are tested
+- Security monitoring provides adequate coverage
+
+## Success Metrics
+- Critical vulnerability remediation > 95%
+- Compliance audit pass rate > 95%
+- Security incident response time < 1 hour
+- Security control effectiveness > 90%
+- Security awareness training completion > 95%
+==================== END: security-analysis ====================
+
+==================== START: data-analysis ====================
+# Data Analysis and Insights Task
+
+## Task Overview
+Analyze data to extract meaningful insights, identify trends and patterns, and provide evidence-based recommendations to support decision-making.
+
+## Prerequisites
+- Data sources identified and accessible
+- Analysis objectives clearly defined
+- Data quality requirements established
+- Statistical methods and tools selected
+
+## Task Steps
+
+### 1. Data Collection and Validation
+- Gather data from identified sources
+- Validate data quality and completeness
+- Clean and preprocess data as needed
+- Document data lineage and transformations
+- Establish data governance procedures
+
+### 2. Exploratory Data Analysis
+- Conduct initial data exploration
+- Identify patterns, trends, and anomalies
+- Generate descriptive statistics
+- Create initial visualizations
+- Formulate hypotheses for testing
+
+### 3. Statistical Analysis
+- Apply appropriate statistical methods
+- Test hypotheses with proper significance testing
+- Calculate confidence intervals and effect sizes
+- Perform correlation and regression analysis
+- Validate results with cross-validation
+
+### 4. Insight Generation
+- Interpret statistical results in business context
+- Identify actionable insights and recommendations
+- Quantify impact and potential value
+- Assess reliability and limitations of findings
+- Prioritize insights by business value
+
+### 5. Visualization and Reporting
+- Create clear and compelling visualizations
+- Develop executive summary and detailed report
+- Present findings to stakeholders
+- Establish ongoing monitoring and tracking
+- Document methodology for reproducibility
+
+## Deliverables
+- Data analysis report with findings
+- Statistical analysis results and validation
+- Data visualizations and dashboards
+- Actionable recommendations
+- Methodology documentation
+- Ongoing monitoring plan
+
+## Quality Criteria
+- Analysis methodology is statistically sound
+- Results are reproducible and validated
+- Insights are actionable and valuable
+- Visualizations are clear and not misleading
+- Recommendations are evidence-based
+
+## Success Metrics
+- Statistical significance of key findings > 95%
+- Stakeholder satisfaction with insights > 90%
+- Implementation rate of recommendations > 80%
+- Business impact of implemented insights > target
+- Data quality score > 95%
+==================== END: data-analysis ====================

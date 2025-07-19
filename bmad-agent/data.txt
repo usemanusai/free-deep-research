@@ -1,0 +1,358 @@
+# BMAD AI Agent Knowledge Base
+# Comprehensive knowledge base for all AI agents
+
+==================== START: bmad-kb ====================
+# BMAD Method Knowledge Base
+
+## Overview
+The BMAD (Business, Management, Analysis, Development) Method is a comprehensive framework for AI-powered software development that combines specialized AI agents with proven methodologies to deliver professional-grade software solutions.
+
+## Core Principles
+
+### 1. Specialized Agent Expertise
+Each AI agent embodies deep domain expertise in their specific area:
+- **Product Manager AI (John)**: Product strategy and requirements
+- **Research Architect AI (Fred)**: Technical architecture and system design
+- **Data Analyst AI (Dakota)**: Statistical analysis and insights
+- **Design Architect AI (Jane)**: UX/UI design and user research
+- **Security Engineer AI (Sage)**: Security analysis and compliance
+- **Task Breakdown Specialist AI (Tyler)**: Project management and planning
+
+### 2. Collaborative Intelligence
+Agents work together through structured workflows:
+- **Sequential Collaboration**: Agents build on each other's work
+- **Parallel Processing**: Multiple agents work simultaneously
+- **Cross-Validation**: Agents review and validate each other's outputs
+- **Consensus Building**: Collaborative decision-making processes
+
+### 3. Quality Assurance
+Built-in quality controls ensure professional outcomes:
+- **Quality Gates**: Checkpoints at each phase
+- **Peer Review**: Cross-agent validation
+- **Stakeholder Validation**: User and business validation
+- **Continuous Improvement**: Learning from each project
+
+## Workflow Modes
+
+### Documentation Mode
+Produces three complete documents ready for developer handoff:
+1. **Product Requirements Document (PRD)**: Complete product specifications
+2. **Architecture Document**: Technical design and implementation approach
+3. **Checklist Document**: Development acceptance criteria and steps
+
+### Full Development Mode
+Complete project development with interactive collaboration:
+- Requirements analysis and validation
+- Architecture design and technical planning
+- Implementation planning and execution
+- Quality assurance and testing
+- Deployment and maintenance planning
+
+## Agent Coordination Patterns
+
+### Lead Agent Model
+One agent takes primary responsibility while others provide support:
+- Lead agent drives the overall process
+- Supporting agents contribute specialized expertise
+- Regular coordination meetings ensure alignment
+- Final deliverables reflect integrated expertise
+
+### Collaborative Model
+All agents work as equals with shared responsibility:
+- Shared ownership of project outcomes
+- Consensus-based decision making
+- Integrated deliverables from all agents
+- Collective quality assurance
+
+### Review Model
+Agents work independently then cross-validate:
+- Each agent produces independent work
+- Cross-review and validation process
+- Conflict resolution through discussion
+- Final deliverables incorporate all feedback
+
+## Quality Standards
+
+### Completeness Criteria
+- All requirements addressed
+- No gaps or missing information
+- Comprehensive coverage of scope
+- Actionable deliverables
+
+### Accuracy Standards
+- Factually correct information
+- Validated assumptions
+- Evidence-based recommendations
+- Peer-reviewed content
+
+### Consistency Requirements
+- Aligned terminology and concepts
+- Consistent formatting and structure
+- Coherent narrative across documents
+- Integrated recommendations
+
+### Professional Standards
+- Industry best practices followed
+- Professional document formatting
+- Clear and concise communication
+- Stakeholder-appropriate language
+
+## Success Metrics
+
+### Process Metrics
+- Time to completion
+- Number of iterations required
+- Stakeholder satisfaction scores
+- Quality gate pass rates
+
+### Outcome Metrics
+- Implementation success rate
+- Business value delivered
+- User satisfaction scores
+- Technical performance metrics
+
+### Learning Metrics
+- Process improvement rate
+- Knowledge base growth
+- Agent capability enhancement
+- Team skill development
+==================== END: bmad-kb ====================
+
+==================== START: market-data ====================
+# Market Research and Analysis Data
+
+## Industry Standards and Benchmarks
+
+### Software Development Metrics
+- **Average Development Time**: 6-18 months for enterprise applications
+- **Quality Metrics**: 80%+ test coverage, <1% critical bugs
+- **Performance Standards**: <2s page load time, 99.9% uptime
+- **Security Standards**: OWASP Top 10 compliance, regular security audits
+
+### Market Research Best Practices
+- **Sample Size**: Minimum 100 respondents for quantitative research
+- **Confidence Level**: 95% confidence interval standard
+- **Response Rate**: 20-30% typical for online surveys
+- **Validation**: Multiple data sources for triangulation
+
+### Competitive Analysis Framework
+- **Market Share Analysis**: Top 5 competitors minimum
+- **Feature Comparison**: Comprehensive feature matrix
+- **Pricing Analysis**: Total cost of ownership comparison
+- **SWOT Analysis**: Strengths, weaknesses, opportunities, threats
+
+## User Research Guidelines
+
+### User Persona Development
+- **Primary Research**: Direct user interviews and surveys
+- **Demographic Data**: Age, location, job role, experience level
+- **Behavioral Patterns**: Usage frequency, feature preferences
+- **Pain Points**: Current challenges and frustrations
+- **Goals and Motivations**: What users want to achieve
+
+### User Journey Mapping
+- **Touchpoints**: All user interactions with product
+- **Emotions**: User feelings at each stage
+- **Pain Points**: Friction and obstacles
+- **Opportunities**: Areas for improvement
+- **Success Metrics**: Measurable outcomes
+
+### Usability Testing Standards
+- **Test Participants**: 5-8 users per round
+- **Task Success Rate**: >80% completion rate target
+- **Time on Task**: Benchmark against competitors
+- **Error Rate**: <5% critical errors acceptable
+- **Satisfaction Score**: >4.0 on 5-point scale
+
+## Technology Trends and Standards
+
+### Current Technology Trends
+- **Cloud-First Architecture**: 90% of new applications cloud-native
+- **Microservices Adoption**: 70% of enterprises using microservices
+- **AI/ML Integration**: 60% of applications include AI features
+- **Mobile-First Design**: 80% of users access via mobile
+- **API-First Development**: RESTful and GraphQL APIs standard
+
+### Security Trends
+- **Zero Trust Architecture**: Default security model
+- **DevSecOps**: Security integrated into development pipeline
+- **Privacy by Design**: GDPR and CCPA compliance required
+- **Multi-Factor Authentication**: Standard for all applications
+- **Encryption**: End-to-end encryption for sensitive data
+
+### Performance Standards
+- **Core Web Vitals**: Google's performance metrics
+- **Largest Contentful Paint**: <2.5 seconds
+- **First Input Delay**: <100 milliseconds
+- **Cumulative Layout Shift**: <0.1
+- **Time to Interactive**: <3.8 seconds on mobile
+==================== END: market-data ====================
+
+==================== START: technical-standards ====================
+# Technical Standards and Best Practices
+
+## Software Development Standards
+
+### Code Quality Standards
+- **Code Coverage**: Minimum 80% test coverage
+- **Cyclomatic Complexity**: Maximum 10 per function
+- **Code Review**: All code must be peer-reviewed
+- **Documentation**: All public APIs documented
+- **Linting**: Automated code style enforcement
+
+### Architecture Principles
+- **SOLID Principles**: Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion
+- **DRY Principle**: Don't repeat yourself
+- **KISS Principle**: Keep it simple, stupid
+- **YAGNI Principle**: You aren't gonna need it
+- **Separation of Concerns**: Clear separation between layers
+
+### API Design Standards
+- **RESTful Design**: Follow REST principles
+- **HTTP Status Codes**: Proper use of status codes
+- **Versioning**: API versioning strategy
+- **Documentation**: OpenAPI/Swagger documentation
+- **Rate Limiting**: Implement rate limiting for public APIs
+
+## Security Standards
+
+### Authentication and Authorization
+- **Multi-Factor Authentication**: Required for admin access
+- **OAuth 2.0**: Standard for third-party authentication
+- **JWT Tokens**: Secure token-based authentication
+- **Role-Based Access Control**: Granular permission system
+- **Session Management**: Secure session handling
+
+### Data Protection
+- **Encryption at Rest**: AES-256 encryption minimum
+- **Encryption in Transit**: TLS 1.3 for all communications
+- **Data Classification**: Classify data by sensitivity
+- **Data Retention**: Clear data retention policies
+- **Privacy by Design**: Privacy considerations from start
+
+### Security Testing
+- **Static Analysis**: Automated security code scanning
+- **Dynamic Analysis**: Runtime security testing
+- **Penetration Testing**: Regular third-party testing
+- **Vulnerability Management**: Regular vulnerability assessments
+- **Incident Response**: Documented response procedures
+
+## Performance Standards
+
+### Frontend Performance
+- **Bundle Size**: <250KB initial bundle
+- **Time to Interactive**: <3 seconds on 3G
+- **First Contentful Paint**: <1.5 seconds
+- **Lighthouse Score**: >90 performance score
+- **Accessibility**: WCAG 2.1 AA compliance
+
+### Backend Performance
+- **Response Time**: <200ms for 95th percentile
+- **Throughput**: Handle 1000+ requests per second
+- **Database Queries**: <100ms for 95th percentile
+- **Memory Usage**: <80% of available memory
+- **CPU Usage**: <70% average utilization
+
+### Scalability Requirements
+- **Horizontal Scaling**: Support for multiple instances
+- **Load Balancing**: Distribute traffic across instances
+- **Caching**: Multi-layer caching strategy
+- **Database Scaling**: Read replicas and sharding
+- **CDN Integration**: Global content distribution
+
+## Quality Assurance Standards
+
+### Testing Strategy
+- **Unit Testing**: 80%+ code coverage
+- **Integration Testing**: All API endpoints tested
+- **End-to-End Testing**: Critical user journeys automated
+- **Performance Testing**: Load and stress testing
+- **Security Testing**: Automated security scanning
+
+### Deployment Standards
+- **Continuous Integration**: Automated build and test
+- **Continuous Deployment**: Automated deployment pipeline
+- **Blue-Green Deployment**: Zero-downtime deployments
+- **Rollback Procedures**: Quick rollback capability
+- **Health Checks**: Automated health monitoring
+
+### Monitoring and Observability
+- **Application Monitoring**: Real-time performance monitoring
+- **Error Tracking**: Automated error detection and alerting
+- **Log Management**: Centralized logging with search
+- **Metrics Collection**: Business and technical metrics
+- **Alerting**: Proactive alerting for issues
+==================== END: technical-standards ====================
+
+==================== START: project-methodologies ====================
+# Project Management Methodologies and Best Practices
+
+## Agile Methodologies
+
+### Scrum Framework
+- **Sprint Duration**: 2-4 week sprints
+- **Sprint Planning**: Detailed planning for each sprint
+- **Daily Standups**: 15-minute daily synchronization
+- **Sprint Review**: Demonstrate completed work
+- **Sprint Retrospective**: Continuous improvement
+
+### Kanban Method
+- **Visual Workflow**: Kanban board with work stages
+- **Work in Progress Limits**: Limit concurrent work
+- **Continuous Flow**: Smooth work progression
+- **Pull System**: Work pulled based on capacity
+- **Continuous Improvement**: Regular process optimization
+
+### Lean Development
+- **Eliminate Waste**: Remove non-value-adding activities
+- **Build Quality In**: Quality at every step
+- **Create Knowledge**: Learning and knowledge sharing
+- **Defer Commitment**: Delay decisions until necessary
+- **Deliver Fast**: Rapid delivery cycles
+
+## Project Planning Best Practices
+
+### Work Breakdown Structure
+- **Hierarchical Decomposition**: Break work into manageable pieces
+- **Deliverable-Oriented**: Focus on deliverables
+- **100% Rule**: All work included in WBS
+- **Mutually Exclusive**: No overlap between work packages
+- **Appropriate Detail**: Right level of detail for management
+
+### Estimation Techniques
+- **Planning Poker**: Team-based estimation
+- **Three-Point Estimation**: Optimistic, pessimistic, most likely
+- **Historical Data**: Use past project data
+- **Expert Judgment**: Leverage team expertise
+- **Bottom-Up Estimation**: Estimate from detailed tasks
+
+### Risk Management
+- **Risk Identification**: Systematic risk identification
+- **Risk Assessment**: Probability and impact analysis
+- **Risk Response**: Avoid, mitigate, transfer, or accept
+- **Risk Monitoring**: Continuous risk tracking
+- **Contingency Planning**: Plans for high-impact risks
+
+## Quality Management
+
+### Quality Planning
+- **Quality Standards**: Define quality criteria
+- **Quality Metrics**: Measurable quality indicators
+- **Quality Assurance**: Process-focused quality activities
+- **Quality Control**: Product-focused quality activities
+- **Continuous Improvement**: Regular process enhancement
+
+### Change Management
+- **Change Control Process**: Formal change approval
+- **Impact Assessment**: Analyze change impacts
+- **Change Documentation**: Document all changes
+- **Stakeholder Communication**: Communicate changes
+- **Change Implementation**: Controlled change rollout
+
+### Stakeholder Management
+- **Stakeholder Identification**: Identify all stakeholders
+- **Stakeholder Analysis**: Assess influence and interest
+- **Communication Planning**: Tailored communication approach
+- **Engagement Strategy**: Active stakeholder involvement
+- **Expectation Management**: Manage stakeholder expectations
+==================== END: project-methodologies ====================

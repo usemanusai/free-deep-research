@@ -1,0 +1,131 @@
+# Free Deep Research System - Production Prometheus Configuration
+# Comprehensive monitoring for all system components
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'free-deep-research-prod'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load alerting rules
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+
+  # Free Deep Research Application
+  - job_name: 'free-deep-research-app'
+    static_configs:
+      - targets: ['app:9090']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+    scrape_timeout: 10s
+    honor_labels: true
+
+  # Nginx Load Balancer
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:9113']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  # PostgreSQL Database
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['database:9187']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  # Redis Cache
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:9121']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  # Node Exporter (System Metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # cAdvisor (Container Metrics)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  # Blackbox Exporter (External Monitoring)
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://your-domain.com
+        - https://api.your-domain.com/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Custom Application Metrics
+  - job_name: 'research-engine'
+    static_configs:
+      - targets: ['app:9091']
+    scrape_interval: 15s
+    metrics_path: '/research/metrics'
+
+  - job_name: 'bmad-agents'
+    static_configs:
+      - targets: ['app:9092']
+    scrape_interval: 30s
+    metrics_path: '/agents/metrics'
+
+  # API Gateway Metrics
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['app:9093']
+    scrape_interval: 15s
+    metrics_path: '/api/metrics'
+
+# Remote write configuration (for long-term storage)
+remote_write:
+  - url: "https://prometheus-remote-write.your-domain.com/api/v1/write"
+    basic_auth:
+      username: "prometheus"
+      password: "your-remote-write-password"
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB
+    wal-compression: true
+
+# Global limits
+global:
+  query_timeout: 2m
+  query_max_concurrency: 20
