@@ -1,0 +1,193 @@
+version: '3.8'
+
+services:
+  # SQLite Database for development (lightweight)
+  database:
+    image: alpine:3.18
+    container_name: fdr-database-dev
+    restart: unless-stopped
+    command: tail -f /dev/null  # Keep container running
+    volumes:
+      - ./bmad-agent/free-deep-research/data:/data
+      - ./docker/database/dev-init.sh:/init.sh
+    networks:
+      - fdr-network
+    healthcheck:
+      test: ["CMD", "test", "-f", "/data/research.db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Redis for development
+  redis:
+    image: redis:7-alpine
+    container_name: fdr-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data_dev:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - fdr-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Rust Backend with hot reload
+  backend:
+    build:
+      context: ./bmad-agent/free-deep-research
+      dockerfile: ../../docker/backend/Dockerfile.dev
+      target: development
+    container_name: fdr-backend-dev
+    restart: unless-stopped
+    environment:
+      - RUST_ENV=development
+      - RUST_LOG=debug
+      - DATABASE_URL=sqlite:///data/research.db
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=dev_jwt_secret_key
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - SERPAPI_KEY=${SERPAPI_KEY}
+      - JINA_API_KEY=${JINA_API_KEY}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - EXA_API_KEY=${EXA_API_KEY}
+      - RUST_BACKTRACE=1
+    volumes:
+      - ./bmad-agent/free-deep-research:/app
+      - ./bmad-agent/free-deep-research/data:/data
+      - cargo_cache:/usr/local/cargo/registry
+      - target_cache:/app/target
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+      - "9229:9229"  # Debug port
+    networks:
+      - fdr-network
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    stdin_open: true
+    tty: true
+
+  # React Frontend with hot reload
+  frontend:
+    build:
+      context: ./bmad-agent/deep_research_frontend
+      dockerfile: ../../docker/frontend/Dockerfile.dev
+      target: development
+    container_name: fdr-frontend-dev
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:8080
+      - REACT_APP_WS_URL=ws://localhost:8080
+      - REACT_APP_VERSION=3.0.0-dev
+      - REACT_APP_BUILD_DATE=${BUILD_DATE:-2025-07-19}
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./bmad-agent/deep_research_frontend:/app
+      - /app/node_modules
+      - ./bmad-agent/deep_research_frontend/public:/app/public
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+      - "24678:24678"  # Vite HMR port
+    networks:
+      - fdr-network
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true
+
+  # Development tools container
+  devtools:
+    build:
+      context: ./docker/devtools
+      dockerfile: Dockerfile
+    container_name: fdr-devtools
+    restart: unless-stopped
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8081:8080"  # Development dashboard
+    networks:
+      - fdr-network
+    profiles:
+      - devtools
+    environment:
+      - WORKSPACE_PATH=/workspace
+      - DOCKER_HOST=unix:///var/run/docker.sock
+
+  # Mailhog for email testing
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: fdr-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - fdr-network
+    profiles:
+      - devtools
+
+  # Database admin interface
+  adminer:
+    image: adminer:4.8.1
+    container_name: fdr-adminer
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    networks:
+      - fdr-network
+    profiles:
+      - devtools
+    environment:
+      - ADMINER_DEFAULT_SERVER=database
+
+  # Redis admin interface
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: fdr-redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8083:8081"
+    networks:
+      - fdr-network
+    profiles:
+      - devtools
+
+volumes:
+  redis_data_dev:
+    driver: local
+  cargo_cache:
+    driver: local
+  target_cache:
+    driver: local
+
+networks:
+  fdr-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

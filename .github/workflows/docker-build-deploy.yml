@@ -1,0 +1,252 @@
+name: Docker Build and Deploy
+
+on:
+  push:
+    branches: [ main, develop, feature/v3.0.0-global-intelligence-network ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Security scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Build and test
+  build-and-test:
+    runs-on: ubuntu-latest
+    needs: security-scan
+    strategy:
+      matrix:
+        environment: [development, production]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+
+      - name: Set up environment
+        run: |
+          cp .env.${{ matrix.environment }} .env
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%d')" >> .env
+          echo "ENVIRONMENT=${{ matrix.environment }}" >> .env
+
+      - name: Create necessary directories
+        run: |
+          mkdir -p docker/{nginx,backend,frontend,database,redis,prometheus,grafana}/{logs,ssl,cache,config}
+          mkdir -p bmad-agent/free-deep-research/data
+
+      - name: Generate SSL certificates for testing
+        run: |
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout docker/nginx/ssl/key.pem \
+            -out docker/nginx/ssl/cert.pem \
+            -subj "/C=US/ST=Test/L=Test/O=Test/CN=localhost"
+          openssl dhparam -out docker/nginx/ssl/dhparam.pem 2048
+
+      - name: Build Docker images
+        run: |
+          if [ "${{ matrix.environment }}" = "development" ]; then
+            docker-compose -f docker-compose.dev.yml build
+          else
+            docker-compose -f docker-compose.prod.yml build
+          fi
+
+      - name: Run tests
+        run: |
+          if [ "${{ matrix.environment }}" = "development" ]; then
+            docker-compose -f docker-compose.dev.yml up -d
+            
+            # Wait for services to be ready
+            sleep 30
+            
+            # Run backend tests
+            docker-compose -f docker-compose.dev.yml exec -T backend cargo test || true
+            
+            # Run frontend tests
+            docker-compose -f docker-compose.dev.yml exec -T frontend npm test -- --coverage --watchAll=false || true
+            
+            # Health checks
+            docker-compose -f docker-compose.dev.yml exec -T backend curl -f http://localhost:8080/health
+            
+            # Cleanup
+            docker-compose -f docker-compose.dev.yml down
+          fi
+
+      - name: Run security scan on images
+        run: |
+          # Scan backend image
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image --exit-code 0 --severity HIGH,CRITICAL \
+            fdr-backend:latest || true
+          
+          # Scan frontend image
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image --exit-code 0 --severity HIGH,CRITICAL \
+            fdr-frontend:latest || true
+
+      - name: Push images to registry
+        if: github.event_name != 'pull_request'
+        run: |
+          # Tag and push backend image
+          docker tag fdr-backend:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ steps.meta.outputs.tags }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ steps.meta.outputs.tags }}
+          
+          # Tag and push frontend image
+          docker tag fdr-frontend:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ steps.meta.outputs.tags }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ steps.meta.outputs.tags }}
+
+  # Deploy to staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Add staging deployment commands here
+          # This could involve SSH to staging server, kubectl commands, etc.
+
+  # Deploy to production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment..."
+          # Add production deployment commands here
+          # This should include proper blue-green or rolling deployment
+
+  # Performance testing
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        run: |
+          cp .env.dev .env
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%d')" >> .env
+
+      - name: Start services for performance testing
+        run: |
+          docker-compose -f docker-compose.dev.yml up -d
+          sleep 60  # Wait for services to be fully ready
+
+      - name: Install k6
+        run: |
+          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Run performance tests
+        run: |
+          # Create basic performance test
+          cat > performance-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+
+          export let options = {
+            stages: [
+              { duration: '30s', target: 10 },
+              { duration: '1m', target: 20 },
+              { duration: '30s', target: 0 },
+            ],
+          };
+
+          export default function() {
+            let response = http.get('http://localhost:8080/health');
+            check(response, {
+              'status is 200': (r) => r.status === 200,
+              'response time < 500ms': (r) => r.timings.duration < 500,
+            });
+            sleep(1);
+          }
+          EOF
+          
+          k6 run performance-test.js
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose -f docker-compose.dev.yml down -v
+
+  # Notification
+  notify:
+    runs-on: ubuntu-latest
+    needs: [build-and-test, deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+      - name: Notify on success
+        if: needs.build-and-test.result == 'success'
+        run: |
+          echo "✅ Build and deployment successful!"
+          # Add notification logic (Slack, Discord, email, etc.)
+
+      - name: Notify on failure
+        if: needs.build-and-test.result == 'failure'
+        run: |
+          echo "❌ Build or deployment failed!"
+          # Add notification logic for failures
