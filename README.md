@@ -102,12 +102,27 @@ BMAD methodology implementation with agent personas, tasks, and templates.
 
 ## 📚 Documentation
 
-- [User Guide](docs/user-guides/COMPLETE_USER_GUIDE_2025.md)
-- [Desktop App Setup](apps/desktop/SETUP_GUIDE.md)
-- [Docker Deployment](docs/deployment/DOCKER-IMPLEMENTATION-SUMMARY.md)
-- [Development Guide](docs/development/)
-- [API Documentation](docs/api/)
-- [Architecture Overview](docs/architecture/)
+### 📖 User Documentation
+- **[Complete User Guide](docs/user-guides/COMPLETE_USER_GUIDE_2025.md)** - Comprehensive user documentation
+- **[Desktop App Setup](apps/desktop/SETUP_GUIDE.md)** - Desktop application setup guide
+
+### 🔌 API Documentation
+- **[API Overview](docs/api/README.md)** - Complete API reference and examples
+- **[Authentication API](docs/api/authentication.md)** - API key management and security
+- **[Research Workflow API](docs/api/research-workflow.md)** - Research execution and management
+- **[BMAD Integration API](docs/api/bmad-integration.md)** - AI agent orchestration
+- **[Analytics API](docs/api/analytics.md)** - Business intelligence and insights
+- **[Monitoring API](docs/api/monitoring.md)** - System health and performance
+- **[Configuration API](docs/api/configuration.md)** - System and user settings
+
+### 🏗️ Architecture Documentation
+- **[Architecture Overview](docs/architecture/README.md)** - High-level architecture and design
+- **[System Overview](docs/architecture/system-overview.md)** - Detailed system components
+
+### 🛠️ Development & Deployment
+- **[Development Guide](docs/development/)** - Development setup and guidelines
+- **[Docker Deployment](docs/deployment/DOCKER-IMPLEMENTATION-SUMMARY.md)** - Docker deployment guide
+- **[Reports & Analysis](docs/reports/)** - Technical reports and system analysis
 
 ## 🚀 Deployment
 
