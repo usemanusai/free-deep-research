@@ -703,11 +703,14 @@ impl WorkflowExecutor for HybridMethodology {
         ]));
         metadata.insert("approach".to_string(), serde_json::Value::String("don_lim_nick_scamara_hybrid".to_string()));
 
+        // Calculate actual word count from content
+        let word_count = content.split_whitespace().count() as u32;
+
         let results = ResearchResults {
             content,
             sources,
             metadata,
-            word_count: 0, // TODO: Calculate actual word count
+            word_count,
             source_count: sources.len() as u32,
             methodology_used: ResearchMethodology::Hybrid,
             execution_time_ms: workflow.execution_duration_ms().unwrap_or(0),

@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'react-hot-toast'
-import { 
-  ChartBarIcon, 
-  CogIcon, 
-  PlayIcon, 
+import {
+  ChartBarIcon,
+  CogIcon,
+  PlayIcon,
   DocumentTextIcon,
   UserGroupIcon,
   ClockIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  PlusIcon,
+  BeakerIcon,
+  EyeIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline'
 
 // Types
@@ -502,12 +506,121 @@ const BMadIntegrationDashboard: React.FC = () => {
                 </p>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-6 text-center">
-                <ClockIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h4 className="text-lg font-medium text-gray-900 mb-2">Research Management Coming Soon</h4>
-                <p className="text-gray-600">
-                  Individual research task management and monitoring will be available in the next update.
-                </p>
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-gray-900">Research Tasks</h3>
+                  <button
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    onClick={() => {
+                      // TODO: Implement new task creation
+                      console.log('Create new research task');
+                    }}
+                  >
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    New Task
+                  </button>
+                </div>
+
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                  <ul className="divide-y divide-gray-200">
+                    {/* Sample research tasks - replace with actual data */}
+                    <li className="px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <BeakerIcon className="h-6 w-6 text-indigo-600" />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              Market Analysis: AI Research Tools
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              Comprehensive analysis of AI-powered research platforms
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Completed
+                          </span>
+                          <button className="text-indigo-600 hover:text-indigo-900">
+                            <EyeIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+
+                    <li className="px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <BeakerIcon className="h-6 w-6 text-blue-600" />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              Technical Architecture Review
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              Evaluating scalable research system architectures
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            In Progress
+                          </span>
+                          <button className="text-indigo-600 hover:text-indigo-900">
+                            <EyeIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+
+                    <li className="px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <BeakerIcon className="h-6 w-6 text-yellow-600" />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              Competitive Intelligence Analysis
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              Research on competing research automation platforms
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Queued
+                          </span>
+                          <button className="text-indigo-600 hover:text-indigo-900">
+                            <EyeIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <InformationCircleIcon className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-blue-800">
+                        Research Task Management
+                      </h3>
+                      <div className="mt-2 text-sm text-blue-700">
+                        <p>
+                          Create, monitor, and manage individual research tasks. Each task can be assigned to specific AI agents and tracked through completion.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

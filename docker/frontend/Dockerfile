@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for React Frontend
 # Stage 1: Build dependencies
-FROM node:18-alpine AS dependencies
+FROM node:20-alpine AS dependencies
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -19,7 +19,7 @@ COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 # Stage 2: Development build
-FROM node:18-alpine AS development
+FROM node:20-alpine AS development
 
 # Install development dependencies
 RUN apk add --no-cache \
