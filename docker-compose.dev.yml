@@ -69,7 +69,7 @@ services:
       - target_cache:/app/target
     ports:
       - "${BACKEND_PORT:-8080}:8080"
-      - "9229:9229"  # Debug port
+      - "${BACKEND_DEBUG_PORT:-9229}:9229"  # Debug port
     networks:
       - fdr-network
     depends_on:
@@ -108,7 +108,7 @@ services:
       - ./bmad-agent/deep_research_frontend/public:/app/public
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
-      - "24678:24678"  # Vite HMR port
+      - "${FRONTEND_HMR_PORT:-24678}:24678"  # Vite HMR port
     networks:
       - fdr-network
     depends_on:
@@ -127,7 +127,7 @@ services:
       - .:/workspace
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "8081:8080"  # Development dashboard
+      - "${DEV_DASHBOARD_PORT:-8081}:8080"  # Development dashboard
     networks:
       - fdr-network
     profiles:
@@ -142,8 +142,8 @@ services:
     container_name: fdr-mailhog
     restart: unless-stopped
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # Web UI
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"  # SMTP
+      - "${MAILHOG_WEB_PORT:-8025}:8025"  # Web UI
     networks:
       - fdr-network
     profiles:
@@ -155,7 +155,7 @@ services:
     container_name: fdr-adminer
     restart: unless-stopped
     ports:
-      - "8082:8080"
+      - "${ADMINER_PORT:-8082}:8080"
     networks:
       - fdr-network
     profiles:
@@ -171,7 +171,7 @@ services:
     environment:
       - REDIS_HOSTS=local:redis:6379
     ports:
-      - "8083:8081"
+      - "${REDIS_COMMANDER_PORT:-8083}:8081"
     networks:
       - fdr-network
     profiles:

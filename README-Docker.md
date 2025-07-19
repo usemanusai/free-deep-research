@@ -45,13 +45,14 @@ setup.bat -e production
 - [Monitoring & Logging](#monitoring--logging)
 - [Security](#security)
 - [Backup & Recovery](#backup--recovery)
+- [Intelligent Port Management](#intelligent-port-management)
 - [Troubleshooting](#troubleshooting)
 - [Performance Tuning](#performance-tuning)
 - [CI/CD Integration](#cicd-integration)
 
 ## 🏗️ Architecture Overview
 
-The Free Deep Research System uses a microservices architecture with the following components:
+The Free Deep Research System uses a microservices architecture with **intelligent port management** and the following components:
 
 ```mermaid
 graph TB
@@ -166,11 +167,14 @@ cd free-deep-research
 # Make setup script executable
 chmod +x setup.sh
 
-# Development setup
+# Development setup (with intelligent port management)
 ./setup.sh
 
 # Production setup with custom options
 ./setup.sh -e production --skip-ssl -v
+
+# Check dynamically assigned ports
+./docker/port-manager/port-manager.sh status
 ```
 
 **Windows:**
@@ -346,6 +350,73 @@ KNOWLEDGE_GRAPH_ENABLED=true
 #### Database Configuration
 - **Backups**: `docker/database/backups/`
 - **Init Scripts**: `docker/database/init/`
+
+## 🔌 Intelligent Port Management
+
+The Free Deep Research System includes an **intelligent port management system** that automatically handles port allocation, conflict prevention, and container lifecycle management.
+
+### Key Features
+
+#### ✅ Dynamic Port Allocation
+- **Automatic Assignment**: Ports are dynamically assigned from safe ranges (30000-65535)
+- **Service-Specific Ranges**: Different port ranges for different service types
+- **Conflict Prevention**: Scans existing Docker containers and system ports
+- **Persistent Assignments**: Port assignments persist across container restarts
+
+#### ✅ Container Lifecycle Management
+- **Existing Container Detection**: Automatically detects existing containers
+- **User Choice Options**: Reuse, replace, run alongside, or clean up
+- **Graceful Shutdown**: Proper port cleanup on container stop
+- **Health Monitoring**: Continuous health checks and port monitoring
+
+### Port Ranges
+
+| Service Type | Port Range | Services |
+|--------------|------------|----------|
+| **Frontend** | 30000-35000 | React frontend, static assets |
+| **Backend** | 35000-40000 | Rust API server, debug ports |
+| **Database** | 40000-45000 | PostgreSQL, SQLite access |
+| **Redis** | 45000-50000 | Redis cache, Redis Commander |
+| **Nginx** | 50000-55000 | Reverse proxy, load balancer |
+| **Monitoring** | 55000-60000 | Prometheus, Grafana |
+| **DevTools** | 60000-65000 | Adminer, Mailhog, dev dashboard |
+
+### Port Management Commands
+
+```bash
+# Check current port assignments and service URLs
+./docker/port-manager/port-manager.sh status
+
+# Regenerate port assignments
+./docker/port-manager/port-manager.sh regenerate development
+
+# Clean up all port allocations
+./docker/port-manager/port-manager.sh cleanup
+
+# Check container status
+./docker/port-manager/container-lifecycle.sh status
+
+# Start port status dashboard
+python3 docker/port-manager/port-status-service.py
+# Access at: http://localhost:8084/
+```
+
+### Container Management Options
+
+When existing containers are detected, you can choose:
+
+1. **Reuse Existing** ✅ - Keep existing containers and ports
+2. **Stop and Replace** 🔄 - Update containers with new ports
+3. **Run Alongside** 🚀 - Create new instance with different ports
+4. **Clean Up** 🧹 - Remove all containers and start fresh
+5. **Cancel** ❌ - Exit without changes
+
+### Port Status Dashboard
+
+Access the web-based port status dashboard:
+- **URL**: `http://localhost:8084/`
+- **Features**: Real-time port status, service discovery, container health
+- **API Endpoints**: `/ports`, `/services`, `/containers`, `/health`
 
 ## 📊 Monitoring & Logging
 

@@ -183,6 +183,30 @@ check_requirements() {
     print_success "All system requirements satisfied"
 }
 
+# Function to setup port management
+setup_port_management() {
+    print_status "Setting up intelligent port management..."
+
+    # Make port manager executable
+    chmod +x docker/port-manager/port-manager.sh
+    chmod +x docker/port-manager/container-lifecycle.sh
+
+    # Generate port registry
+    if docker/port-manager/port-manager.sh generate "$ENVIRONMENT"; then
+        print_success "Port registry generated successfully"
+    else
+        print_error "Failed to generate port registry"
+        exit 1
+    fi
+
+    # Check for existing containers and manage them
+    if docker/port-manager/container-lifecycle.sh manage "$ENVIRONMENT"; then
+        print_success "Container lifecycle management completed"
+    else
+        print_warning "Container lifecycle management had issues, but continuing..."
+    fi
+}
+
 # Function to setup environment files
 setup_environment() {
     print_status "Setting up environment configuration for: $ENVIRONMENT"
@@ -223,6 +247,18 @@ setup_environment() {
         sed -i '' "s/BUILD_DATE=.*/BUILD_DATE=$build_date/" "$env_file"
     else
         sed -i "s/BUILD_DATE=.*/BUILD_DATE=$build_date/" "$env_file"
+    fi
+
+    # Setup port management
+    setup_port_management
+
+    # Merge port registry with environment file
+    if [[ -f ".env.ports" ]]; then
+        print_status "Merging port registry with environment file..."
+        echo "" >> "$env_file"
+        echo "# Dynamic Port Assignments (Auto-generated)" >> "$env_file"
+        cat .env.ports >> "$env_file"
+        print_success "Port assignments merged into environment file"
     fi
 
     print_success "Environment configuration completed"
@@ -653,22 +689,29 @@ show_final_status() {
     print_success "All services are running successfully!"
 
     echo ""
-    print_status "Service URLs:"
-    
-    if [[ "$ENVIRONMENT" == "development" ]]; then
-        echo "  🌐 Frontend:           http://localhost:3000"
-        echo "  🔧 Backend API:        http://localhost:8080"
-        echo "  📊 Prometheus:         http://localhost:9090"
-        echo "  📈 Grafana:            http://localhost:3001"
-        echo "  🗄️  Database Admin:     http://localhost:8082"
-        echo "  🔴 Redis Commander:    http://localhost:8083"
-        echo "  📧 Mailhog:            http://localhost:8025"
-        echo "  🛠️  Dev Dashboard:      http://localhost:8081"
+    print_status "Service URLs (Dynamic Port Assignments):"
+
+    # Display dynamically assigned ports
+    if docker/port-manager/port-manager.sh status; then
+        print_success "Port assignments displayed above"
     else
-        echo "  🌐 Frontend:           https://localhost"
-        echo "  🔧 Backend API:        https://localhost/api"
-        echo "  📊 Prometheus:         http://localhost:9090"
-        echo "  📈 Grafana:            http://localhost:3001"
+        print_warning "Could not display port assignments, using defaults:"
+
+        if [[ "$ENVIRONMENT" == "development" ]]; then
+            echo "  🌐 Frontend:           http://localhost:3000"
+            echo "  🔧 Backend API:        http://localhost:8080"
+            echo "  📊 Prometheus:         http://localhost:9090"
+            echo "  📈 Grafana:            http://localhost:3001"
+            echo "  🗄️  Database Admin:     http://localhost:8082"
+            echo "  🔴 Redis Commander:    http://localhost:8083"
+            echo "  📧 Mailhog:            http://localhost:8025"
+            echo "  🛠️  Dev Dashboard:      http://localhost:8081"
+        else
+            echo "  🌐 Frontend:           https://localhost"
+            echo "  🔧 Backend API:        https://localhost/api"
+            echo "  📊 Prometheus:         http://localhost:9090"
+            echo "  📈 Grafana:            http://localhost:3001"
+        fi
     fi
 
     echo ""
@@ -677,6 +720,12 @@ show_final_status() {
     echo "  🔄 Restart services:   docker-compose restart"
     echo "  🛑 Stop services:      docker-compose down"
     echo "  🧹 Clean up:           docker-compose down -v --remove-orphans"
+    echo ""
+    print_status "Port management commands:"
+    echo "  🔍 Check port status:  docker/port-manager/port-manager.sh status"
+    echo "  🔄 Regenerate ports:   docker/port-manager/port-manager.sh regenerate $ENVIRONMENT"
+    echo "  🧹 Cleanup ports:      docker/port-manager/port-manager.sh cleanup"
+    echo "  📊 Container status:   docker/port-manager/container-lifecycle.sh status"
 
     if [[ "$ENVIRONMENT" == "production" ]]; then
         echo ""

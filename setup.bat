@@ -203,6 +203,20 @@ if defined missing_deps (
 call :print_success "All system requirements satisfied"
 goto :eof
 
+REM Function to setup port management
+:setup_port_management
+call :print_status "Setting up intelligent port management..."
+
+REM Generate port registry
+docker\port-manager\port-manager.bat generate "%ENVIRONMENT%"
+if errorlevel 1 (
+    call :print_error "Failed to generate port registry"
+    exit /b 1
+)
+
+call :print_success "Port registry generated successfully"
+goto :eof
+
 REM Function to setup environment files
 :setup_environment
 call :print_status "Setting up environment configuration for: %ENVIRONMENT%"
@@ -238,6 +252,18 @@ for /f "tokens=1-3 delims=/ " %%a in ('date /t') do (
     set "build_date=%%c-%%a-%%b"
 )
 powershell -Command "(Get-Content '%env_file%') -replace 'BUILD_DATE=.*', 'BUILD_DATE=%build_date%' | Set-Content '%env_file%'"
+
+REM Setup port management
+call :setup_port_management
+
+REM Merge port registry with environment file
+if exist ".env.ports" (
+    call :print_status "Merging port registry with environment file..."
+    echo. >> "%env_file%"
+    echo # Dynamic Port Assignments (Auto-generated) >> "%env_file%"
+    type .env.ports >> "%env_file%"
+    call :print_success "Port assignments merged into environment file"
+)
 
 call :print_success "Environment configuration completed"
 goto :eof
@@ -333,22 +359,30 @@ call :print_success "Environment: %ENVIRONMENT%"
 call :print_success "All services are running successfully!"
 
 echo.
-call :print_status "Service URLs:"
+call :print_status "Service URLs (Dynamic Port Assignments):"
 
-if "%ENVIRONMENT%"=="development" (
-    echo   🌐 Frontend:           http://localhost:3000
-    echo   🔧 Backend API:        http://localhost:8080
-    echo   📊 Prometheus:         http://localhost:9090
-    echo   📈 Grafana:            http://localhost:3001
-    echo   🗄️  Database Admin:     http://localhost:8082
-    echo   🔴 Redis Commander:    http://localhost:8083
-    echo   📧 Mailhog:            http://localhost:8025
-    echo   🛠️  Dev Dashboard:      http://localhost:8081
+REM Display dynamically assigned ports
+docker\port-manager\port-manager.bat status
+if errorlevel 1 (
+    call :print_warning "Could not display port assignments, using defaults:"
+
+    if "%ENVIRONMENT%"=="development" (
+        echo   🌐 Frontend:           http://localhost:3000
+        echo   🔧 Backend API:        http://localhost:8080
+        echo   📊 Prometheus:         http://localhost:9090
+        echo   📈 Grafana:            http://localhost:3001
+        echo   🗄️  Database Admin:     http://localhost:8082
+        echo   🔴 Redis Commander:    http://localhost:8083
+        echo   📧 Mailhog:            http://localhost:8025
+        echo   🛠️  Dev Dashboard:      http://localhost:8081
+    ) else (
+        echo   🌐 Frontend:           https://localhost
+        echo   🔧 Backend API:        https://localhost/api
+        echo   📊 Prometheus:         http://localhost:9090
+        echo   📈 Grafana:            http://localhost:3001
+    )
 ) else (
-    echo   🌐 Frontend:           https://localhost
-    echo   🔧 Backend API:        https://localhost/api
-    echo   📊 Prometheus:         http://localhost:9090
-    echo   📈 Grafana:            http://localhost:3001
+    call :print_success "Port assignments displayed above"
 )
 
 echo.
@@ -357,6 +391,11 @@ echo   📋 View logs:          docker-compose logs -f
 echo   🔄 Restart services:   docker-compose restart
 echo   🛑 Stop services:      docker-compose down
 echo   🧹 Clean up:           docker-compose down -v --remove-orphans
+echo.
+call :print_status "Port management commands:"
+echo   🔍 Check port status:  docker\port-manager\port-manager.bat status
+echo   🔄 Regenerate ports:   docker\port-manager\port-manager.bat regenerate %ENVIRONMENT%
+echo   🧹 Cleanup ports:      docker\port-manager\port-manager.bat cleanup
 
 if "%ENVIRONMENT%"=="production" (
     echo.
