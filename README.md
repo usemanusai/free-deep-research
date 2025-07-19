@@ -1,18 +1,17 @@
 # 🔬 Free Deep Research System
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 [![Node.js](https://img.shields.io/badge/node.js-20+-green.svg)](https://nodejs.org)
 [![Tauri](https://img.shields.io/badge/tauri-1.5+-blue.svg)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/typescript-5.3+-blue.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/react-18.2+-61DAFB.svg)](https://reactjs.org)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/usemanusai/free-deep-research/actions)
-[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)](https://github.com/usemanusai/free-deep-research)
-[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](https://github.com/usemanusai/free-deep-research/releases)
+[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://www.docker.com)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](CHANGELOG.md)
 
 > **Next-Generation AI-Powered Research Platform with BMAD Agent Integration and Enterprise Intelligence**
 
-A revolutionary, cross-platform research automation platform that combines advanced AI agent orchestration, multi-methodology research engines, and enterprise-grade intelligence capabilities. Features complete BMAD AI Agent integration, distributed computing, real-time collaboration, and autonomous research capabilities—all while maintaining zero operational costs through intelligent free-tier optimization.
+A revolutionary, multi-component research automation platform that combines advanced AI agent orchestration, cross-platform desktop applications, containerized deployments, and enterprise-grade intelligence capabilities. Features complete BMAD AI Agent integration, distributed computing, real-time collaboration, and autonomous research capabilities—all while maintaining zero operational costs through intelligent free-tier optimization.
 
 ## 🌟 Latest Updates - Version 3.0.0 "Global Intelligence Network" 🚀
 
@@ -76,17 +75,16 @@ A revolutionary, cross-platform research automation platform that combines advan
 ## 📋 Table of Contents
 
 - [🎯 Project Overview](#-project-overview)
+- [🏗️ Multi-Component Architecture](#️-multi-component-architecture)
 - [✨ Key Features](#-key-features)
-- [🏗️ Architecture](#️-architecture)
-- [🚀 Installation](#-installation)
+- [🚀 Quick Start](#-quick-start)
+- [📦 Installation Options](#-installation-options)
 - [📖 Usage Examples](#-usage-examples)
 - [🔧 Configuration](#-configuration)
 - [📊 Analytics & Optimization](#-analytics--optimization)
 - [📈 Output Processing](#-output-processing)
-- [📉 Analysis & Visualization](#-analysis--visualization)
-- [🔄 Export Capabilities](#-export-capabilities)
 - [🛠️ Development](#️-development)
-- [📚 API Documentation](#-api-documentation)
+- [📚 Documentation](#-documentation)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 - [🗺️ Roadmap](#️-roadmap)
@@ -96,19 +94,37 @@ A revolutionary, cross-platform research automation platform that combines advan
 
 ## 🎯 Project Overview
 
-The Free Deep Research System is a next-generation AI-powered research automation platform that revolutionizes how organizations conduct research. Combining advanced AI agent orchestration, multi-methodology research engines, and enterprise-grade intelligence capabilities, it delivers unprecedented research quality while maintaining zero operational costs.
+The Free Deep Research System is a comprehensive, multi-component research automation platform that revolutionizes how organizations conduct research. This system combines advanced AI agent orchestration, cross-platform desktop applications, containerized deployments, and enterprise-grade intelligence capabilities to deliver unprecedented research quality while maintaining zero operational costs.
+
+### 🏗️ Multi-Component Architecture
+
+This repository contains three main components that work together to provide a complete research automation solution:
+
+#### 🤖 AI Orchestrator (`ai-orchestrator/`)
+- **BMAD AI Agent System**: Complete Business, Management, Architecture, Development methodology implementation
+- **Multi-Agent Coordination**: Product Manager (John), Technical Architect (Fred), Platform Engineer (Alex)
+- **Evidence-Based Documentation**: Research-powered PRD, Architecture, and Implementation documents
+- **Professional Quality Standards**: Enterprise-grade communication and business-appropriate outputs
+
+#### 🖥️ Desktop Application (`bmad-agent/`)
+- **Cross-Platform Desktop App**: Native Tauri application for Windows, macOS, and Linux
+- **Professional GUI**: React/TypeScript frontend with real-time monitoring and management
+- **Enterprise Security**: Military-grade AES-256-GCM encryption with automatic key rotation
+- **Advanced Analytics**: Comprehensive analytics dashboard with predictive intelligence
+
+#### 🐳 Docker Deployment (`docker/`)
+- **Containerized Architecture**: Complete Docker-based deployment system
+- **Intelligent Port Management**: Automatic port detection and conflict resolution
+- **Multi-Environment Support**: Development, staging, and production configurations
+- **Scalable Infrastructure**: Horizontal scaling and load balancing capabilities
 
 ### 🚀 Revolutionary Capabilities
 
-- **BMAD AI Agent Integration**: Research-powered AI agents (Product Manager, Architect, Platform Engineer) with evidence-based outputs and collaborative intelligence
-- **Autonomous Research Planning**: AI-driven research strategy with 85%+ accuracy in methodology selection and execution optimization
-- **Zero Operational Costs**: Intelligent orchestration of free-tier services (OpenRouter, SerpApi, Jina AI, Firecrawl, Tavily, Exa AI) with cost optimization
-- **Enterprise Intelligence**: Military-grade security, distributed computing, real-time collaboration, and advanced ML analytics
+- **Zero Operational Costs**: Intelligent orchestration of free-tier services (OpenRouter, SerpApi, Jina AI, Firecrawl, Tavily, Exa AI)
+- **Multi-Deployment Options**: Desktop application, Docker containers, or cloud deployment
+- **Enterprise Intelligence**: Military-grade security, distributed computing, real-time collaboration
 - **Professional Quality**: Enterprise-grade research outputs with citations, evidence validation, and quality assurance
-- **Multi-Agent Coordination**: Collaborative AI agents with cross-validation, consensus building, and intelligent task distribution
 - **Advanced Methodologies**: Don Lim (cost-optimized), Nick Scamara (professional), Hybrid, and custom AI-driven approaches
-- **Real-Time Collaboration**: Live multi-user research sessions with conflict resolution and synchronized workspaces
-- **Distributed Architecture**: Cluster deployment, horizontal scaling, and enterprise system integration
 - **Comprehensive Intelligence**: Predictive analytics, knowledge graphs, semantic analysis, and automated optimization
 
 ### 🎯 Target Audience
@@ -119,19 +135,20 @@ The Free Deep Research System is a next-generation AI-powered research automatio
 - **Consultants & Analysts**: Evidence-based research with professional documentation and enterprise-grade security
 - **Academic Researchers**: Comprehensive literature reviews with semantic analysis and knowledge graph integration
 - **Development Teams**: Research-enhanced documentation generation with technical architecture validation
+- **DevOps Teams**: Containerized deployment with intelligent port management and scaling capabilities
 
 ### 🌟 Revolutionary Advantages
 
 Unlike expensive commercial platforms ($500+ monthly) or basic alternatives, this system provides:
 
-1. **AI Agent Intelligence**: BMAD-integrated research agents with collaborative decision-making and evidence validation
-2. **Autonomous Operation**: AI-driven research planning, execution, and optimization with minimal human intervention
-3. **Enterprise Architecture**: Distributed computing, real-time collaboration, and horizontal scaling capabilities
-4. **Zero Operational Costs**: Advanced intelligence while maintaining free-tier optimization and cost management
+1. **Multi-Deployment Flexibility**: Choose from desktop app, Docker containers, or cloud deployment based on your needs
+2. **AI Agent Intelligence**: BMAD-integrated research agents with collaborative decision-making and evidence validation
+3. **Zero Operational Costs**: Advanced intelligence while maintaining free-tier optimization and cost management
+4. **Enterprise Architecture**: Distributed computing, real-time collaboration, and horizontal scaling capabilities
 5. **Military-Grade Security**: AES-256-GCM encryption, distributed security, and comprehensive audit trails
-6. **Real-Time Intelligence**: Live collaboration, predictive analytics, and automated optimization recommendations
-7. **Professional Integration**: SSO, LDAP, RBAC, and enterprise system integration with compliance frameworks
-8. **Advanced ML Capabilities**: Custom model training, predictive insights, and intelligent workflow optimization
+6. **Professional Integration**: Complete development workflow from research to implementation
+7. **Intelligent Infrastructure**: Automatic port management, conflict resolution, and scaling capabilities
+8. **Cross-Platform Excellence**: Native desktop applications and containerized deployments for any environment
 
 ---
 
@@ -846,50 +863,88 @@ flowchart TB
 
 ---
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### 📋 Prerequisites
+Choose your preferred deployment method:
 
-Ensure you have the following installed on your system:
-
-| Requirement | Version | Purpose |
-|-------------|---------|---------|
-| **Node.js** | 20.x+ | Frontend development and build tools |
-| **Rust** | 1.75+ | Backend compilation and Tauri framework |
-| **Git** | Latest | Version control and repository management |
-
-### 🖥️ Platform-Specific Requirements
-
-#### Windows
-- Windows 10 version 1903+ or Windows 11
-- Microsoft Visual C++ Redistributable
-- WebView2 Runtime (usually pre-installed)
-
-#### macOS
-- macOS 10.15 (Catalina) or later
-- Xcode Command Line Tools: `xcode-select --install`
-
-#### Linux
-- Ubuntu 18.04+, Debian 10+, or equivalent
-- Required packages:
-  ```bash
-  sudo apt update
-  sudo apt install libwebkit2gtk-4.0-dev \
-    build-essential \
-    curl \
-    wget \
-    libssl-dev \
-    libgtk-3-dev \
-    libayatana-appindicator3-dev \
-    librsvg2-dev
-  ```
-
-### ⚡ Quick Installation
+### 🖥️ Option 1: Desktop Application (Recommended for Individual Use)
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/usemanusai/free-deep-research.git
 cd free-deep-research/bmad-agent/free-deep-research
+
+# 2. Install dependencies
+npm install
+cargo build
+
+# 3. Start the desktop application
+npm run tauri dev
+```
+
+### 🐳 Option 2: Docker Deployment (Recommended for Teams/Production)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/usemanusai/free-deep-research.git
+cd free-deep-research
+
+# 2. Quick start with Docker
+./setup.sh  # Linux/macOS
+# or
+setup.bat   # Windows
+
+# 3. Access the application
+# The system will automatically detect available ports and start services
+```
+
+### 🤖 Option 3: AI Orchestrator Only
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/usemanusai/free-deep-research.git
+cd free-deep-research/ai-orchestrator
+
+# 2. Follow the AI Orchestrator setup instructions
+# (Refer to ai-orchestrator/README.md for detailed setup)
+```
+
+## 📦 Installation Options
+
+### 📋 Prerequisites
+
+| Component | Requirements |
+|-----------|-------------|
+| **Desktop App** | Node.js 20+, Rust 1.75+, Platform-specific WebView |
+| **Docker** | Docker 20+, Docker Compose 2+ |
+| **AI Orchestrator** | Python 3.8+, Node.js 18+ |
+
+### 🖥️ Desktop Application Setup
+
+#### Platform-Specific Requirements
+
+**Windows:**
+- Windows 10 version 1903+ or Windows 11
+- Microsoft Visual C++ Redistributable
+- WebView2 Runtime (usually pre-installed)
+
+**macOS:**
+- macOS 10.15 (Catalina) or later
+- Xcode Command Line Tools: `xcode-select --install`
+
+**Linux:**
+- Ubuntu 18.04+, Debian 10+, or equivalent
+- Required packages:
+  ```bash
+  sudo apt update
+  sudo apt install libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+  ```
+
+#### Installation Steps
+
+```bash
+# 1. Navigate to desktop application
+cd bmad-agent/free-deep-research
 
 # 2. Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -898,40 +953,15 @@ source $HOME/.cargo/env
 # 3. Install Tauri CLI
 cargo install tauri-cli
 
-# 4. Install frontend dependencies
+# 4. Install dependencies and build
 npm install
-
-# 5. Build Rust dependencies
 cargo build
 
-# 6. Start development server
+# 5. Start development server
 npm run tauri dev
-```
 
-### 🏗️ Production Build
-
-```bash
-# Build for current platform
+# 6. Build for production
 npm run tauri build
-
-# Cross-platform builds
-npm run build:windows    # Windows MSI installer
-npm run build:macos      # macOS DMG package
-npm run build:linux      # Linux DEB/AppImage
-```
-
-### ✅ Verification
-
-```bash
-# Verify installation
-rustc --version
-cargo --version
-node --version
-npm --version
-
-# Run tests
-npm test
-cargo test
 ```
 
 ---
@@ -1220,64 +1250,109 @@ compression_enabled = true
 
 ## 🛠️ Development
 
+### 🐳 Docker Deployment Setup
+
+The Docker deployment provides the most comprehensive and scalable solution:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/usemanusai/free-deep-research.git
+cd free-deep-research
+
+# 2. Choose your environment
+cp .env.example .env.dev    # Development
+cp .env.example .env.prod   # Production
+
+# 3. Configure environment variables
+nano .env.dev  # Edit as needed
+
+# 4. Start with intelligent setup
+./setup.sh     # Linux/macOS
+setup.bat      # Windows
+
+# 5. Manual Docker commands (alternative)
+docker-compose -f docker-compose.dev.yml up -d    # Development
+docker-compose -f docker-compose.prod.yml up -d   # Production
+```
+
+**Docker Features:**
+- **Intelligent Port Management**: Automatic port detection and conflict resolution
+- **Multi-Environment Support**: Separate configurations for dev/staging/production
+- **Health Monitoring**: Built-in health checks and service monitoring
+- **Scalable Architecture**: Horizontal scaling and load balancing
+
+For detailed Docker setup and troubleshooting, see:
+- [📋 Docker Implementation Summary](DOCKER-IMPLEMENTATION-SUMMARY.md)
+- [🐳 Docker README](README-Docker.md)
+- [🔧 Docker Troubleshooting](TROUBLESHOOTING-Docker.md)
+- [🔌 Intelligent Port Management](INTELLIGENT-PORT-MANAGEMENT-SUMMARY.md)
+
 ### 🏗️ Development Environment Setup
 
 ```bash
 # 1. Clone and setup
 git clone https://github.com/usemanusai/free-deep-research.git
-cd free-deep-research/bmad-agent/free-deep-research
 
-# 2. Install development tools
+# 2. Choose your component
+cd ai-orchestrator/          # AI Orchestrator development
+cd bmad-agent/free-deep-research/  # Desktop app development
+cd docker/                   # Docker configuration development
+
+# 3. Install development tools (for desktop app)
+cd bmad-agent/free-deep-research/
 cargo install tauri-cli
 cargo install cargo-watch
 npm install -g concurrently
 
-# 3. Setup pre-commit hooks
+# 4. Setup pre-commit hooks
 npm install husky --save-dev
 npx husky install
 npx husky add .husky/pre-commit "npm run lint && cargo clippy"
 
-# 4. Start development environment
+# 5. Start development environment
 npm run dev  # Starts both frontend and backend with hot reload
 ```
 
-### 📁 Project Structure
+### 📁 Repository Structure
 
 ```
 free-deep-research/
-├── src/                          # React frontend source
-│   ├── components/              # Reusable UI components
-│   │   ├── api-management/      # API key management UI
-│   │   ├── dashboard/           # Executive dashboard
-│   │   ├── research/            # Research workflow UI
-│   │   ├── templates/           # Template management UI
-│   │   ├── monitoring/          # Real-time monitoring
-│   │   └── settings/            # Configuration panels
-│   ├── hooks/                   # Custom React hooks
-│   ├── services/                # API service layer
-│   ├── stores/                  # State management (Zustand)
-│   ├── types/                   # TypeScript definitions
-│   └── utils/                   # Utility functions
-├── src-tauri/                   # Rust backend source
-│   ├── src/
-│   │   ├── commands/            # Tauri command handlers
-│   │   ├── services/            # Core business logic
-│   │   │   ├── api_manager/     # API management service
-│   │   │   ├── research_engine/ # Research execution engine
-│   │   │   ├── template_manager/# Template system
-│   │   │   ├── data_persistence/# Database operations
-│   │   │   ├── monitoring/      # System monitoring
-│   │   │   └── security/        # Security & encryption
-│   │   ├── models/              # Data models
-│   │   ├── error/               # Error handling
-│   │   └── utils/               # Utility functions
-│   ├── Cargo.toml              # Rust dependencies
-│   └── tauri.conf.json         # Tauri configuration
-├── docs/                        # Documentation
-│   ├── prd.md                  # Product Requirements
-│   ├── architecture.md         # Technical Architecture
-│   └── checklist.md            # Development Checklist
-└── scripts/                     # Build and deployment scripts
+├── ai-orchestrator/             # BMAD AI Agent Orchestrator
+│   ├── agent-config.txt        # AI agent configurations
+│   ├── personas.txt            # Agent persona definitions
+│   ├── templates.txt           # Document templates
+│   ├── checklists.txt          # Quality checklists
+│   └── tasks.txt               # Agent task definitions
+├── bmad-agent/                  # Desktop Application
+│   └── free-deep-research/     # Tauri desktop app
+│       ├── src/                # React frontend source
+│       │   ├── components/     # UI components
+│       │   ├── hooks/          # Custom React hooks
+│       │   ├── services/       # API service layer
+│       │   ├── stores/         # State management
+│       │   └── types/          # TypeScript definitions
+│       ├── src-tauri/          # Rust backend source
+│       │   ├── src/
+│       │   │   ├── commands/   # Tauri command handlers
+│       │   │   ├── services/   # Core business logic
+│       │   │   ├── models/     # Data models
+│       │   │   └── utils/      # Utility functions
+│       │   ├── Cargo.toml      # Rust dependencies
+│       │   └── tauri.conf.json # Tauri configuration
+│       └── package.json        # Node.js dependencies
+├── docker/                      # Docker Deployment
+│   ├── services/               # Individual service containers
+│   ├── nginx/                  # Reverse proxy configuration
+│   └── monitoring/             # Monitoring and logging
+├── docker-compose.yml          # Main Docker Compose
+├── docker-compose.dev.yml      # Development environment
+├── docker-compose.prod.yml     # Production environment
+├── setup.sh                    # Linux/macOS setup script
+├── setup.bat                   # Windows setup script
+├── CHANGELOG.md                # Version history and updates
+├── README-Docker.md            # Docker-specific documentation
+├── TROUBLESHOOTING-Docker.md   # Docker troubleshooting guide
+└── INTELLIGENT-PORT-MANAGEMENT-SUMMARY.md  # Port management docs
 ```
 
 ### 🧪 Testing Strategy
@@ -1337,9 +1412,36 @@ npm run package              # Create distribution packages
 
 ---
 
-## 📚 API Documentation
+## 📚 Documentation
+
+### 📖 Available Documentation
+
+This repository includes comprehensive documentation for all components:
+
+#### 🔄 Version History & Updates
+- [📋 **CHANGELOG.md**](CHANGELOG.md) - Complete version history, features, and updates
+
+#### 🐳 Docker Deployment Documentation
+- [🐳 **Docker README**](README-Docker.md) - Complete Docker deployment guide
+- [📋 **Docker Implementation Summary**](DOCKER-IMPLEMENTATION-SUMMARY.md) - Architecture and implementation details
+- [🔧 **Docker Troubleshooting**](TROUBLESHOOTING-Docker.md) - Common issues and solutions
+- [🔌 **Intelligent Port Management**](INTELLIGENT-PORT-MANAGEMENT-SUMMARY.md) - Port management system documentation
+
+#### 🤖 AI Orchestrator Documentation
+- **Agent Configuration**: `ai-orchestrator/agent-config.txt` - AI agent system configuration
+- **Agent Personas**: `ai-orchestrator/personas.txt` - Detailed agent personality definitions
+- **Document Templates**: `ai-orchestrator/templates.txt` - Professional document templates
+- **Quality Checklists**: `ai-orchestrator/checklists.txt` - Quality assurance checklists
+- **Task Definitions**: `ai-orchestrator/tasks.txt` - Agent task specifications
+
+#### 🖥️ Desktop Application Documentation
+- **Application README**: `bmad-agent/free-deep-research/README.md` - Desktop app specific documentation
+- **API Documentation**: Comprehensive API documentation within the desktop application
+- **Configuration Guide**: Environment and configuration management
 
 ### 🔑 Core Services API
+
+The desktop application provides comprehensive API documentation. Key services include:
 
 #### Template Management Service
 
@@ -1641,33 +1743,46 @@ We welcome contributions from the community! This project follows the **BMAD (Bu
 1. **Fork the repository**
    ```bash
    git clone https://github.com/YOUR_USERNAME/free-deep-research.git
-   cd free-deep-research/bmad-agent/free-deep-research
+   cd free-deep-research
    ```
 
-2. **Create a feature branch**
+2. **Choose your development area**
+   ```bash
+   cd ai-orchestrator/          # AI agent development
+   cd bmad-agent/free-deep-research/  # Desktop app development
+   cd docker/                   # Docker infrastructure development
+   ```
+
+3. **Create a feature branch**
    ```bash
    git checkout -b feature/amazing-feature
    ```
 
-3. **Make your changes**
+4. **Make your changes**
    - Follow the established code style and conventions
    - Add tests for new functionality
    - Update documentation as needed
 
-4. **Validate your changes**
+5. **Validate your changes**
    ```bash
+   # For desktop app development
+   cd bmad-agent/free-deep-research/
    npm run validate              # Run all quality checks
    npm test                      # Run test suite
    cargo test                    # Run Rust tests
+
+   # For Docker development
+   cd docker/
+   docker-compose config         # Validate Docker configurations
    ```
 
-5. **Commit your changes**
+6. **Commit your changes**
    ```bash
    git commit -m "feat: add amazing feature"
    # Use conventional commit format: feat|fix|docs|style|refactor|test|chore
    ```
 
-6. **Push and create PR**
+7. **Push and create PR**
    ```bash
    git push origin feature/amazing-feature
    # Create pull request on GitHub
@@ -1731,6 +1846,32 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - ✅ **Private use** - Use privately
 - ❌ **Liability** - No warranty or liability
 - ❌ **Warranty** - No warranty provided
+
+### MIT License
+
+```
+MIT License
+
+Copyright (c) 2025 Free Deep Research System
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ---
 
@@ -1852,10 +1993,9 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ### 🆘 Getting Help
 
-- **📖 Documentation**: [Project Wiki](https://github.com/usemanusai/free-deep-research/wiki)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/usemanusai/free-deep-research/issues)
-- **💬 Discussions**: [GitHub Discussions](https://github.com/usemanusai/free-deep-research/discussions)
-- **📧 Email**: support@freedeepresearch.com
+- **💬 Feature Requests**: [GitHub Issues](https://github.com/usemanusai/free-deep-research/issues)
+- **📖 Documentation**: Available in this repository (see [Documentation](#-documentation) section)
 
 ### 🌐 Community Resources
 
@@ -1863,10 +2003,12 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
   - [Don Lim's Free Deep Research Methodology](https://freedium.cfd/https://medium.com/@don-lim/how-to-set-up-your-own-free-deep-research-in-less-than-1-hour-7534a4a877b0)
   - [Nick Scamara's Open Deep Research](https://github.com/nickscamara/open-deep-research)
 
-- **📚 Additional Documentation**:
-  - [📄 Product Requirements Document](docs/prd.md)
-  - [🏗️ Technical Architecture](docs/architecture.md)
-  - [✅ Development Checklist](docs/checklist.md)
+- **📚 Repository Documentation**:
+  - [📋 Version History & Updates](CHANGELOG.md)
+  - [🐳 Docker Deployment Guide](README-Docker.md)
+  - [🔧 Docker Troubleshooting](TROUBLESHOOTING-Docker.md)
+  - [📋 Docker Implementation Details](DOCKER-IMPLEMENTATION-SUMMARY.md)
+  - [🔌 Port Management System](INTELLIGENT-PORT-MANAGEMENT-SUMMARY.md)
 
 ### 📞 Support Channels
 
