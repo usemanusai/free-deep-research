@@ -111,23 +111,23 @@ pub async fn create_research_workflow(
 graph TB
     subgraph "REST API Structure"
         subgraph "Core APIs"
-            AUTH_API[/api/auth]
-            RESEARCH_API[/api/research]
-            CONFIG_API[/api/config]
-            MONITOR_API[/api/monitoring]
+            AUTH_API["/api/auth"]
+            RESEARCH_API["/api/research"]
+            CONFIG_API["/api/config"]
+            MONITOR_API["/api/monitoring"]
         end
         
         subgraph "V3.0.0 APIs"
-            FED_API[/api/federated]
-            MARKET_API[/api/marketplace]
-            QUANTUM_API[/api/quantum]
-            NLP_API[/api/nlp]
+            FED_API["/api/federated"]
+            MARKET_API["/api/marketplace"]
+            QUANTUM_API["/api/quantum"]
+            NLP_API["/api/nlp"]
         end
-        
+
         subgraph "Integration APIs"
-            BMAD_API[/api/bmad]
-            WEBHOOK_API[/api/webhooks]
-            EXTERNAL_API[/api/external]
+            BMAD_API["/api/bmad"]
+            WEBHOOK_API["/api/webhooks"]
+            EXTERNAL_API["/api/external"]
         end
     end
 ```
