@@ -1,0 +1,398 @@
+# Istio DestinationRules for Free Deep Research System
+# Phase 4.3: Infrastructure Modernization
+
+# Backend service destination rules
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: backend-destination-rule
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-destination-rule
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  host: backend-service
+  trafficPolicy:
+    # Load balancing
+    loadBalancer:
+      simple: LEAST_CONN
+    
+    # Connection pool settings
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        keepAlive:
+          time: 7200s
+          interval: 75s
+      http:
+        http1MaxPendingRequests: 64
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+        minHealthPercent: 50
+    
+    # Circuit breaker
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+      splitExternalLocalOriginErrors: false
+  
+  # Service subsets for different workload types
+  subsets:
+  # Command handlers (write operations)
+  - name: command-handlers
+    labels:
+      workload-type: command
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+      connectionPool:
+        tcp:
+          maxConnections: 50
+        http:
+          http1MaxPendingRequests: 32
+          maxRequestsPerConnection: 5
+  
+  # Query handlers (read operations)
+  - name: query-handlers
+    labels:
+      workload-type: query
+    trafficPolicy:
+      loadBalancer:
+        simple: LEAST_CONN
+      connectionPool:
+        tcp:
+          maxConnections: 200
+        http:
+          http1MaxPendingRequests: 128
+          maxRequestsPerConnection: 20
+  
+  # AI handlers (AI operations)
+  - name: ai-handlers
+    labels:
+      workload-type: ai
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+      connectionPool:
+        tcp:
+          maxConnections: 20
+          connectTimeout: 60s
+        http:
+          http1MaxPendingRequests: 10
+          maxRequestsPerConnection: 2
+          h2UpgradePolicy: UPGRADE
+  
+  # Event handlers (event sourcing)
+  - name: event-handlers
+    labels:
+      workload-type: event
+    trafficPolicy:
+      loadBalancer:
+        simple: LEAST_CONN
+      connectionPool:
+        tcp:
+          maxConnections: 100
+        http:
+          http1MaxPendingRequests: 64
+          maxRequestsPerConnection: 10
+  
+  # WebSocket handlers
+  - name: websocket-handlers
+    labels:
+      workload-type: websocket
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+      connectionPool:
+        tcp:
+          maxConnections: 1000
+          keepAlive:
+            time: 86400s  # 24 hours for WebSocket connections
+            interval: 60s
+
+---
+# Frontend service destination rules
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: frontend-destination-rule
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-destination-rule
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  host: frontend-service
+  trafficPolicy:
+    # Load balancing for static content
+    loadBalancer:
+      simple: ROUND_ROBIN
+    
+    # Connection pool for web traffic
+    connectionPool:
+      tcp:
+        maxConnections: 200
+        connectTimeout: 10s
+        keepAlive:
+          time: 600s
+          interval: 60s
+      http:
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 200
+        maxRequestsPerConnection: 50
+        maxRetries: 2
+        consecutiveGatewayErrors: 3
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 30
+    
+    # Circuit breaker for frontend
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 30
+      minHealthPercent: 70
+
+---
+# Redis service destination rules
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: redis-destination-rule
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-destination-rule
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  host: redis-service
+  trafficPolicy:
+    # Load balancing for Redis
+    loadBalancer:
+      simple: LEAST_CONN
+    
+    # Connection pool for Redis
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 5s
+        keepAlive:
+          time: 3600s
+          interval: 60s
+    
+    # Circuit breaker for Redis
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  
+  # Redis subsets
+  subsets:
+  # Master Redis instance
+  - name: master
+    labels:
+      redis-role: master
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+  
+  # Slave Redis instances
+  - name: slave
+    labels:
+      redis-role: slave
+    trafficPolicy:
+      loadBalancer:
+        simple: LEAST_CONN
+
+---
+# PostgreSQL service destination rules
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: postgresql-destination-rule
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-destination-rule
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  host: postgresql-service
+  trafficPolicy:
+    # Load balancing for PostgreSQL
+    loadBalancer:
+      simple: LEAST_CONN
+    
+    # Connection pool for PostgreSQL
+    connectionPool:
+      tcp:
+        maxConnections: 20
+        connectTimeout: 30s
+        keepAlive:
+          time: 7200s
+          interval: 75s
+    
+    # Circuit breaker for PostgreSQL
+    outlierDetection:
+      consecutiveGatewayErrors: 2
+      consecutive5xxErrors: 2
+      interval: 30s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 25
+      minHealthPercent: 75
+  
+  # PostgreSQL subsets
+  subsets:
+  # Primary database
+  - name: primary
+    labels:
+      postgresql-role: primary
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+  
+  # Read replicas
+  - name: replica
+    labels:
+      postgresql-role: replica
+    trafficPolicy:
+      loadBalancer:
+        simple: LEAST_CONN
+
+---
+# Global destination rule for mTLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: default-destination-rule
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-destination-rule
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  host: "*.free-deep-research.svc.cluster.local"
+  trafficPolicy:
+    # Enable mTLS for all services
+    tls:
+      mode: ISTIO_MUTUAL
+    
+    # Default connection pool settings
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        keepAlive:
+          time: 7200s
+          interval: 75s
+      http:
+        http1MaxPendingRequests: 64
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+    
+    # Default circuit breaker
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+
+---
+# External services destination rules
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: external-services-destination-rule
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-destination-rule
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  host: "*.googleapis.com"
+  trafficPolicy:
+    # TLS for external services
+    tls:
+      mode: SIMPLE
+    
+    # Connection pool for external APIs
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 32
+        maxRequestsPerConnection: 5
+        maxRetries: 3
+    
+    # Circuit breaker for external services
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 60s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 25
+      minHealthPercent: 75
+
+---
+# Service mesh configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: destination-rules-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-destination-rule
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  config.yaml: |
+    # Destination rules configuration
+    
+    # Load balancing algorithms
+    load_balancing:
+      default: LEAST_CONN
+      static_content: ROUND_ROBIN
+      database: LEAST_CONN
+      cache: LEAST_CONN
+      ai_services: ROUND_ROBIN
+    
+    # Connection pool defaults
+    connection_pool:
+      tcp:
+        max_connections: 100
+        connect_timeout: 30s
+        keep_alive_time: 7200s
+        keep_alive_interval: 75s
+      http:
+        max_pending_requests: 64
+        max_requests: 100
+        max_requests_per_connection: 10
+        max_retries: 3
+    
+    # Circuit breaker defaults
+    circuit_breaker:
+      consecutive_gateway_errors: 5
+      consecutive_5xx_errors: 5
+      interval: 30s
+      base_ejection_time: 30s
+      max_ejection_percent: 50
+      min_health_percent: 50
+    
+    # TLS settings
+    tls:
+      internal_services: ISTIO_MUTUAL
+      external_services: SIMPLE
+      min_protocol_version: TLSv1_2
+      max_protocol_version: TLSv1_3

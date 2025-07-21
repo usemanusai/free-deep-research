@@ -1,0 +1,432 @@
+# Free Deep Research System - Unified GraphQL Schema
+# Phase 4.4: API Gateway & GraphQL
+
+# Scalar types
+scalar DateTime
+scalar UUID
+scalar JSON
+scalar Upload
+
+# Root Query type
+type Query {
+  # Authentication & User Management
+  me: User
+  users(filter: UserFilter, pagination: PaginationInput): UserConnection!
+  user(id: UUID!): User
+  
+  # API Key Management
+  apiKeys(filter: ApiKeyFilter, pagination: PaginationInput): ApiKeyConnection!
+  apiKey(id: UUID!): ApiKey
+  apiKeyUsageStats(keyId: UUID!, timeRange: TimeRange): UsageStats!
+  
+  # Research Workflows
+  researchWorkflows(filter: WorkflowFilter, pagination: PaginationInput): WorkflowConnection!
+  researchWorkflow(id: UUID!): ResearchWorkflow
+  researchTemplates(filter: TemplateFilter): [ResearchTemplate!]!
+  researchTemplate(id: UUID!): ResearchTemplate
+  
+  # System Configuration
+  systemConfig: SystemConfiguration!
+  userConfig(userId: UUID): UserConfiguration!
+  
+  # Monitoring & Analytics
+  systemMetrics(timeRange: TimeRange): SystemMetrics!
+  performanceMetrics(service: String, timeRange: TimeRange): PerformanceMetrics!
+  auditLogs(filter: AuditLogFilter, pagination: PaginationInput): AuditLogConnection!
+  
+  # V3.0.0 Features
+  federatedResearch(filter: FederatedFilter): [FederatedResearchNode!]!
+  aiMarketplace(category: MarketplaceCategory): [MarketplaceItem!]!
+  quantumResources(filter: QuantumFilter): [QuantumResource!]!
+  nlpModels(filter: NLPModelFilter): [NLPModel!]!
+  knowledgeGraph(graphId: UUID!): KnowledgeGraph
+  knowledgeNodes(graphId: UUID!, filter: NodeFilter): [KnowledgeNode!]!
+  
+  # BMAD Integration
+  bmadAgents: [BMadAgent!]!
+  bmadWorkflows(agentId: String): [BMadWorkflow!]!
+  
+  # Real-time Data
+  liveMetrics: LiveMetrics!
+  activeConnections: [Connection!]!
+}
+
+# Root Mutation type
+type Mutation {
+  # Authentication
+  login(input: LoginInput!): AuthPayload!
+  logout: Boolean!
+  refreshToken(token: String!): AuthPayload!
+  updateProfile(input: UpdateProfileInput!): User!
+  
+  # API Key Management
+  createApiKey(input: CreateApiKeyInput!): ApiKey!
+  updateApiKey(id: UUID!, input: UpdateApiKeyInput!): ApiKey!
+  deleteApiKey(id: UUID!): Boolean!
+  testApiKey(id: UUID!): ApiKeyTestResult!
+  rotateApiKey(id: UUID!): ApiKey!
+  
+  # Research Workflows
+  createResearchWorkflow(input: CreateWorkflowInput!): ResearchWorkflow!
+  updateResearchWorkflow(id: UUID!, input: UpdateWorkflowInput!): ResearchWorkflow!
+  deleteResearchWorkflow(id: UUID!): Boolean!
+  executeResearchWorkflow(id: UUID!, input: ExecuteWorkflowInput): WorkflowExecution!
+  pauseWorkflowExecution(executionId: UUID!): Boolean!
+  resumeWorkflowExecution(executionId: UUID!): Boolean!
+  cancelWorkflowExecution(executionId: UUID!): Boolean!
+  
+  # Template Management
+  createResearchTemplate(input: CreateTemplateInput!): ResearchTemplate!
+  updateResearchTemplate(id: UUID!, input: UpdateTemplateInput!): ResearchTemplate!
+  deleteResearchTemplate(id: UUID!): Boolean!
+  
+  # Configuration
+  updateSystemConfig(input: SystemConfigInput!): SystemConfiguration!
+  updateUserConfig(input: UserConfigInput!): UserConfiguration!
+  
+  # V3.0.0 Features
+  createFederatedResearch(input: FederatedResearchInput!): FederatedResearchNode!
+  joinFederatedNetwork(networkId: UUID!): Boolean!
+  publishToMarketplace(input: MarketplacePublishInput!): MarketplaceItem!
+  deployQuantumWorkflow(input: QuantumDeployInput!): QuantumExecution!
+  trainNLPModel(input: NLPTrainingInput!): NLPTrainingJob!
+  
+  # Knowledge Graph
+  createKnowledgeGraph(input: CreateKnowledgeGraphInput!): KnowledgeGraph!
+  addKnowledgeNode(graphId: UUID!, input: AddNodeInput!): KnowledgeNode!
+  addKnowledgeEdge(graphId: UUID!, input: AddEdgeInput!): KnowledgeEdge!
+  updateKnowledgeNode(nodeId: UUID!, input: UpdateNodeInput!): KnowledgeNode!
+  
+  # BMAD Integration
+  executeBmadWorkflow(agentId: String!, input: BMadExecutionInput!): BMadExecution!
+  updateBmadAgent(agentId: String!, input: BMadAgentInput!): BMadAgent!
+}
+
+# Root Subscription type
+type Subscription {
+  # Real-time workflow updates
+  workflowExecutionUpdates(workflowId: UUID!): WorkflowExecutionUpdate!
+  workflowStatusChanged(userId: UUID): WorkflowStatusUpdate!
+  
+  # System monitoring
+  systemMetricsUpdates: SystemMetricsUpdate!
+  performanceAlerts: PerformanceAlert!
+  
+  # API key monitoring
+  apiKeyUsageUpdates(keyId: UUID!): ApiKeyUsageUpdate!
+  rateLimitAlerts(userId: UUID): RateLimitAlert!
+  
+  # Federated research
+  federatedResearchUpdates(networkId: UUID!): FederatedResearchUpdate!
+  collaborationInvites(userId: UUID!): CollaborationInvite!
+  
+  # Knowledge graph updates
+  knowledgeGraphUpdates(graphId: UUID!): KnowledgeGraphUpdate!
+  
+  # BMAD real-time updates
+  bmadExecutionUpdates(executionId: UUID!): BMadExecutionUpdate!
+}
+
+# User types
+type User {
+  id: UUID!
+  username: String!
+  email: String!
+  displayName: String
+  avatar: String
+  role: UserRole!
+  permissions: [Permission!]!
+  preferences: UserPreferences!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  lastLoginAt: DateTime
+  
+  # Relationships
+  apiKeys: [ApiKey!]!
+  researchWorkflows: [ResearchWorkflow!]!
+  federatedNetworks: [FederatedResearchNode!]!
+}
+
+enum UserRole {
+  ADMIN
+  RESEARCHER
+  COLLABORATOR
+  VIEWER
+}
+
+type Permission {
+  id: String!
+  name: String!
+  description: String!
+  resource: String!
+  actions: [String!]!
+}
+
+# API Key types
+type ApiKey {
+  id: UUID!
+  name: String!
+  service: ServiceProvider!
+  status: ApiKeyStatus!
+  rateLimit: Int!
+  currentUsage: Int!
+  usagePercentage: Float!
+  lastUsed: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  
+  # Usage analytics
+  usageStats(timeRange: TimeRange): UsageStats!
+  performanceMetrics: KeyPerformanceMetrics!
+}
+
+enum ServiceProvider {
+  OPENROUTER
+  SERPAPI
+  JINA
+  FIRECRAWL
+  TAVILY
+  EXA
+  CUSTOM
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  INACTIVE
+  RATE_LIMITED
+  ERROR
+  EXPIRED
+}
+
+# Research Workflow types
+type ResearchWorkflow {
+  id: UUID!
+  name: String!
+  description: String
+  methodology: ResearchMethodology!
+  status: WorkflowStatus!
+  progress: Float!
+  estimatedCompletion: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  
+  # Relationships
+  creator: User!
+  template: ResearchTemplate
+  executions: [WorkflowExecution!]!
+  collaborators: [User!]!
+  
+  # Configuration
+  configuration: WorkflowConfiguration!
+  outputFormats: [OutputFormat!]!
+  
+  # Results
+  results: WorkflowResults
+  artifacts: [WorkflowArtifact!]!
+}
+
+enum WorkflowStatus {
+  DRAFT
+  READY
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ResearchMethodology {
+  DON_LIM
+  NICK_SCAMARA
+  HYBRID
+  CUSTOM
+}
+
+# System Configuration types
+type SystemConfiguration {
+  id: UUID!
+  version: String!
+  environment: Environment!
+  features: FeatureFlags!
+  limits: SystemLimits!
+  security: SecurityConfig!
+  integrations: IntegrationConfig!
+  updatedAt: DateTime!
+}
+
+enum Environment {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+}
+
+# V3.0.0 Feature types
+type FederatedResearchNode {
+  id: UUID!
+  name: String!
+  description: String!
+  networkId: UUID!
+  nodeType: FederatedNodeType!
+  capabilities: [String!]!
+  status: NodeStatus!
+  endpoint: String!
+  lastSeen: DateTime!
+  
+  # Network information
+  network: FederatedNetwork!
+  peers: [FederatedResearchNode!]!
+  sharedResources: [SharedResource!]!
+}
+
+enum FederatedNodeType {
+  COORDINATOR
+  PARTICIPANT
+  OBSERVER
+  RESOURCE_PROVIDER
+}
+
+type KnowledgeGraph {
+  id: UUID!
+  name: String!
+  description: String!
+  domain: String!
+  status: GraphStatus!
+  statistics: GraphStatistics!
+  configuration: GraphConfiguration!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  
+  # Graph data
+  nodes: [KnowledgeNode!]!
+  edges: [KnowledgeEdge!]!
+  
+  # Query capabilities
+  sparqlEndpoint: String!
+  queryEndpoint: String!
+}
+
+type KnowledgeNode {
+  id: UUID!
+  nodeType: NodeType!
+  name: String!
+  description: String
+  properties: JSON!
+  embeddingVector: [Float!]
+  confidenceScore: Float!
+  sourceType: SourceType!
+  sourceId: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  
+  # Relationships
+  incomingEdges: [KnowledgeEdge!]!
+  outgoingEdges: [KnowledgeEdge!]!
+  relatedNodes(limit: Int = 10): [KnowledgeNode!]!
+}
+
+# Input types
+input LoginInput {
+  username: String!
+  password: String!
+  rememberMe: Boolean = false
+}
+
+input CreateApiKeyInput {
+  name: String!
+  service: ServiceProvider!
+  key: String!
+  rateLimit: Int = 1000
+}
+
+input CreateWorkflowInput {
+  name: String!
+  description: String
+  methodology: ResearchMethodology!
+  templateId: UUID
+  configuration: WorkflowConfigurationInput!
+}
+
+input PaginationInput {
+  first: Int
+  after: String
+  last: Int
+  before: String
+}
+
+input TimeRange {
+  start: DateTime!
+  end: DateTime!
+}
+
+# Filter types
+input UserFilter {
+  role: UserRole
+  status: UserStatus
+  search: String
+}
+
+input ApiKeyFilter {
+  service: ServiceProvider
+  status: ApiKeyStatus
+  search: String
+}
+
+input WorkflowFilter {
+  status: WorkflowStatus
+  methodology: ResearchMethodology
+  createdBy: UUID
+  search: String
+}
+
+# Connection types (for pagination)
+type UserConnection {
+  edges: [UserEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type UserEdge {
+  node: User!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+# Response types
+type AuthPayload {
+  token: String!
+  refreshToken: String!
+  user: User!
+  expiresAt: DateTime!
+}
+
+type ApiKeyTestResult {
+  success: Boolean!
+  responseTime: Int!
+  error: String
+  metadata: JSON
+}
+
+type WorkflowExecution {
+  id: UUID!
+  workflowId: UUID!
+  status: ExecutionStatus!
+  progress: Float!
+  startedAt: DateTime!
+  completedAt: DateTime
+  error: String
+  results: JSON
+}
+
+enum ExecutionStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}

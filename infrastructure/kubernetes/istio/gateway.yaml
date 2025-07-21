@@ -1,0 +1,342 @@
+# Istio Gateway Configuration for Free Deep Research System
+# Phase 4.3: Infrastructure Modernization
+
+# Main Gateway for external traffic
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # HTTPS traffic
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: fdr-tls-certificate
+    hosts:
+    - app.freedeepresearch.org
+    - api.freedeepresearch.org
+    - ws.freedeepresearch.org
+  
+  # HTTP traffic (redirect to HTTPS)
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - app.freedeepresearch.org
+    - api.freedeepresearch.org
+    - ws.freedeepresearch.org
+    tls:
+      httpsRedirect: true
+
+---
+# Development Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-dev-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    environment: development
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # HTTPS traffic for development
+  - port:
+      number: 443
+      name: https-dev
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: fdr-dev-tls-certificate
+    hosts:
+    - dev.freedeepresearch.org
+    - staging.freedeepresearch.org
+  
+  # HTTP traffic for development (no redirect for easier testing)
+  - port:
+      number: 80
+      name: http-dev
+      protocol: HTTP
+    hosts:
+    - dev.freedeepresearch.org
+    - staging.freedeepresearch.org
+
+---
+# Internal Gateway for service-to-service communication
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-internal-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    access: internal
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # Internal HTTPS traffic
+  - port:
+      number: 8443
+      name: https-internal
+      protocol: HTTPS
+    tls:
+      mode: MUTUAL
+      credentialName: fdr-internal-tls-certificate
+    hosts:
+    - internal.freedeepresearch.org
+    - "*.free-deep-research.svc.cluster.local"
+  
+  # Internal HTTP traffic (for health checks and metrics)
+  - port:
+      number: 8080
+      name: http-internal
+      protocol: HTTP
+    hosts:
+    - internal.freedeepresearch.org
+    - "*.free-deep-research.svc.cluster.local"
+
+---
+# Mesh Gateway for cross-cluster communication
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-mesh-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    scope: mesh
+spec:
+  selector:
+    istio: eastwestgateway
+  servers:
+  # Cross-cluster mTLS traffic
+  - port:
+      number: 15443
+      name: tls
+      protocol: TLS
+    tls:
+      mode: ISTIO_MUTUAL
+    hosts:
+    - "*.local"
+    - "*.free-deep-research.svc.cluster.local"
+
+---
+# Gateway for monitoring and observability
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-monitoring-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: monitoring
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # Monitoring HTTPS traffic
+  - port:
+      number: 443
+      name: https-monitoring
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: fdr-monitoring-tls-certificate
+    hosts:
+    - monitoring.freedeepresearch.org
+    - grafana.freedeepresearch.org
+    - prometheus.freedeepresearch.org
+    - jaeger.freedeepresearch.org
+    - kiali.freedeepresearch.org
+
+---
+# Gateway configuration for WebSocket connections
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-websocket-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    protocol: websocket
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # WebSocket HTTPS traffic
+  - port:
+      number: 443
+      name: https-ws
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: fdr-tls-certificate
+    hosts:
+    - ws.freedeepresearch.org
+  
+  # WebSocket HTTP traffic (for development)
+  - port:
+      number: 80
+      name: http-ws
+      protocol: HTTP
+    hosts:
+    - ws.freedeepresearch.org
+
+---
+# Gateway for AI/ML services
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-ai-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: ai-services
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # AI services HTTPS traffic
+  - port:
+      number: 443
+      name: https-ai
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: fdr-ai-tls-certificate
+    hosts:
+    - ai.freedeepresearch.org
+    - ml.freedeepresearch.org
+    - orchestrator.freedeepresearch.org
+
+---
+# Gateway Security Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-security-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  security.yaml: |
+    # Gateway security configuration
+    
+    # TLS configuration
+    tls:
+      min_protocol_version: TLSv1_2
+      max_protocol_version: TLSv1_3
+      cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+        - ECDHE-ECDSA-AES256-GCM-SHA384
+        - ECDHE-RSA-AES256-GCM-SHA384
+      
+    # Rate limiting
+    rate_limiting:
+      requests_per_second: 1000
+      burst_size: 2000
+      
+    # DDoS protection
+    ddos_protection:
+      enable: true
+      threshold: 10000
+      block_duration: 300
+      
+    # IP filtering
+    ip_filtering:
+      whitelist:
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+        - "192.168.0.0/16"
+      blacklist: []
+      
+    # Request validation
+    request_validation:
+      max_request_size: 10MB
+      max_header_size: 8KB
+      max_uri_length: 2048
+      
+    # Security headers
+    security_headers:
+      strict_transport_security: "max-age=31536000; includeSubDomains"
+      content_security_policy: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:;"
+      x_frame_options: "DENY"
+      x_content_type_options: "nosniff"
+      x_xss_protection: "1; mode=block"
+      referrer_policy: "strict-origin-when-cross-origin"
+
+---
+# Gateway Performance Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-performance-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  performance.yaml: |
+    # Gateway performance configuration
+    
+    # Connection settings
+    connections:
+      max_connections: 10000
+      connection_timeout: 30s
+      keep_alive_timeout: 75s
+      
+    # Buffer settings
+    buffers:
+      request_buffer_size: 16KB
+      response_buffer_size: 16KB
+      
+    # Compression
+    compression:
+      enable: true
+      level: 6
+      min_length: 1024
+      types:
+        - text/plain
+        - text/css
+        - application/json
+        - application/javascript
+        - text/xml
+        - application/xml
+        - application/xml+rss
+        - text/javascript
+        - image/svg+xml
+        
+    # Caching
+    caching:
+      enable: true
+      static_assets_ttl: 31536000  # 1 year
+      api_cache_ttl: 300  # 5 minutes
+      
+    # Load balancing
+    load_balancing:
+      algorithm: round_robin
+      health_check_interval: 10s
+      unhealthy_threshold: 3
+      healthy_threshold: 2

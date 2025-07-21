@@ -1,0 +1,417 @@
+# Istio VirtualService Configuration for Free Deep Research System
+# Phase 4.3: Infrastructure Modernization
+
+# Main application VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fdr-main-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  hosts:
+  - app.freedeepresearch.org
+  gateways:
+  - fdr-gateway
+  http:
+  # Static assets with caching
+  - match:
+    - uri:
+        regex: ".*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$"
+    route:
+    - destination:
+        host: frontend-service
+        port:
+          number: 3000
+    headers:
+      response:
+        add:
+          cache-control: "public, max-age=31536000, immutable"
+          expires: "Thu, 31 Dec 2025 23:59:59 GMT"
+    timeout: 30s
+  
+  # API routes
+  - match:
+    - uri:
+        prefix: "/api/"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+    headers:
+      request:
+        add:
+          x-forwarded-proto: "https"
+      response:
+        add:
+          cache-control: "no-cache, no-store, must-revalidate"
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+  
+  # WebSocket routes
+  - match:
+    - uri:
+        prefix: "/ws/"
+    - headers:
+        upgrade:
+          exact: "websocket"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+    timeout: 0s  # No timeout for WebSocket connections
+  
+  # Default route to frontend
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: frontend-service
+        port:
+          number: 3000
+    headers:
+      response:
+        add:
+          cache-control: "no-cache, no-store, must-revalidate"
+    timeout: 30s
+
+---
+# API VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fdr-api-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  hosts:
+  - api.freedeepresearch.org
+  gateways:
+  - fdr-gateway
+  http:
+  # Health check endpoint
+  - match:
+    - uri:
+        exact: "/health"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+    timeout: 5s
+    headers:
+      response:
+        add:
+          cache-control: "no-cache"
+  
+  # Metrics endpoint (internal only)
+  - match:
+    - uri:
+        exact: "/metrics"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 9090
+    timeout: 10s
+    headers:
+      request:
+        add:
+          x-internal-request: "true"
+  
+  # CQRS Commands (POST/PUT/DELETE)
+  - match:
+    - uri:
+        prefix: "/api/v1/commands/"
+    - method:
+        regex: "POST|PUT|DELETE"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+        subset: command-handlers
+    timeout: 60s
+    retries:
+      attempts: 2
+      perTryTimeout: 30s
+      retryOn: 5xx,reset,connect-failure
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 5s
+  
+  # CQRS Queries (GET)
+  - match:
+    - uri:
+        prefix: "/api/v1/queries/"
+    - method:
+        exact: "GET"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+        subset: query-handlers
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure
+    headers:
+      response:
+        add:
+          cache-control: "public, max-age=300"
+  
+  # AI Orchestration endpoints
+  - match:
+    - uri:
+        prefix: "/api/v1/ai/"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+        subset: ai-handlers
+    timeout: 300s  # Longer timeout for AI operations
+    retries:
+      attempts: 1
+      perTryTimeout: 300s
+  
+  # Event sourcing endpoints
+  - match:
+    - uri:
+        prefix: "/api/v1/events/"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+        subset: event-handlers
+    timeout: 30s
+    retries:
+      attempts: 2
+      perTryTimeout: 15s
+  
+  # Default API route
+  - match:
+    - uri:
+        prefix: "/api/"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+
+---
+# WebSocket VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fdr-websocket-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  hosts:
+  - ws.freedeepresearch.org
+  gateways:
+  - fdr-websocket-gateway
+  http:
+  # Real-time collaboration WebSocket
+  - match:
+    - uri:
+        prefix: "/collaboration/"
+    - headers:
+        upgrade:
+          exact: "websocket"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+        subset: websocket-handlers
+    timeout: 0s
+    headers:
+      request:
+        add:
+          x-websocket-type: "collaboration"
+  
+  # AI orchestration WebSocket
+  - match:
+    - uri:
+        prefix: "/ai-stream/"
+    - headers:
+        upgrade:
+          exact: "websocket"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+        subset: websocket-handlers
+    timeout: 0s
+    headers:
+      request:
+        add:
+          x-websocket-type: "ai-stream"
+  
+  # General WebSocket endpoint
+  - match:
+    - uri:
+        prefix: "/ws/"
+    - headers:
+        upgrade:
+          exact: "websocket"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+        subset: websocket-handlers
+    timeout: 0s
+
+---
+# Development VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fdr-dev-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+    environment: development
+spec:
+  hosts:
+  - dev.freedeepresearch.org
+  - staging.freedeepresearch.org
+  gateways:
+  - fdr-dev-gateway
+  http:
+  # Development API with relaxed timeouts
+  - match:
+    - uri:
+        prefix: "/api/"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+    timeout: 120s
+    retries:
+      attempts: 1
+    headers:
+      request:
+        add:
+          x-environment: "development"
+      response:
+        add:
+          access-control-allow-origin: "*"
+          access-control-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+          access-control-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+  
+  # Development WebSocket
+  - match:
+    - uri:
+        prefix: "/ws/"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+    timeout: 0s
+    headers:
+      request:
+        add:
+          x-environment: "development"
+  
+  # Development frontend
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: frontend-service
+        port:
+          number: 3000
+    timeout: 30s
+    headers:
+      response:
+        add:
+          x-environment: "development"
+
+---
+# Internal services VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fdr-internal-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+    access: internal
+spec:
+  hosts:
+  - internal.freedeepresearch.org
+  gateways:
+  - fdr-internal-gateway
+  http:
+  # Prometheus metrics
+  - match:
+    - uri:
+        prefix: "/metrics"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 9090
+    timeout: 30s
+    headers:
+      request:
+        add:
+          x-internal-metrics: "true"
+  
+  # Health checks
+  - match:
+    - uri:
+        prefix: "/health"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+    timeout: 10s
+  
+  # Admin interface
+  - match:
+    - uri:
+        prefix: "/admin"
+    route:
+    - destination:
+        host: backend-service
+        port:
+          number: 8080
+    timeout: 60s
+    headers:
+      request:
+        add:
+          x-admin-access: "true"
