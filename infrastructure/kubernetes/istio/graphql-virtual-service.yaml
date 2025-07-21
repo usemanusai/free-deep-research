@@ -1,0 +1,455 @@
+# Istio GraphQL VirtualService Configuration for Free Deep Research System
+# Phase 4.4: API Gateway & GraphQL
+
+# Main GraphQL VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fdr-graphql-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql
+spec:
+  hosts:
+  - graphql.freedeepresearch.org
+  - api-v4.freedeepresearch.org
+  gateways:
+  - fdr-graphql-gateway
+  http:
+  # GraphQL Playground (development only)
+  - match:
+    - uri:
+        exact: "/playground"
+    - uri:
+        exact: "/graphql/playground"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+    headers:
+      request:
+        add:
+          x-graphql-playground: "true"
+    timeout: 30s
+  
+  # GraphQL WebSocket subscriptions
+  - match:
+    - uri:
+        exact: "/graphql"
+    - headers:
+        upgrade:
+          exact: "websocket"
+    - headers:
+        connection:
+          regex: ".*[Uu]pgrade.*"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+        subset: subscription-handlers
+    timeout: 0s  # No timeout for WebSocket connections
+    headers:
+      request:
+        add:
+          x-graphql-subscription: "true"
+  
+  # GraphQL HTTP endpoint
+  - match:
+    - uri:
+        exact: "/graphql"
+    - method:
+        regex: "GET|POST|OPTIONS"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+        subset: query-handlers
+    timeout: 60s
+    retries:
+      attempts: 3
+      perTryTimeout: 20s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+    headers:
+      request:
+        add:
+          x-graphql-http: "true"
+      response:
+        add:
+          cache-control: "no-cache, no-store, must-revalidate"
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 5s
+  
+  # GraphQL Schema endpoint (for federation)
+  - match:
+    - uri:
+        exact: "/graphql/schema"
+    - uri:
+        exact: "/_schema"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+        subset: schema-handlers
+    timeout: 30s
+    headers:
+      request:
+        add:
+          x-graphql-schema: "true"
+  
+  # Health check endpoint
+  - match:
+    - uri:
+        exact: "/health"
+    - uri:
+        exact: "/ready"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+    timeout: 10s
+    headers:
+      response:
+        add:
+          cache-control: "no-cache"
+  
+  # Metrics endpoint (internal only)
+  - match:
+    - uri:
+        exact: "/metrics"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 9090
+    timeout: 30s
+    headers:
+      request:
+        add:
+          x-internal-metrics: "true"
+  
+  # GraphQL Federation endpoints
+  - match:
+    - uri:
+        prefix: "/federation/"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+        subset: federation-handlers
+    timeout: 60s
+    retries:
+      attempts: 2
+      perTryTimeout: 30s
+    headers:
+      request:
+        add:
+          x-graphql-federation: "true"
+
+---
+# Development GraphQL VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fdr-graphql-dev-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql
+    environment: development
+spec:
+  hosts:
+  - graphql-dev.freedeepresearch.org
+  - graphql-staging.freedeepresearch.org
+  gateways:
+  - fdr-graphql-dev-gateway
+  http:
+  # Development GraphQL with relaxed security
+  - match:
+    - uri:
+        exact: "/graphql"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+    timeout: 120s
+    retries:
+      attempts: 1
+    headers:
+      request:
+        add:
+          x-environment: "development"
+          x-enable-introspection: "true"
+          x-enable-playground: "true"
+      response:
+        add:
+          access-control-allow-origin: "*"
+          access-control-allow-methods: "GET, POST, OPTIONS"
+          access-control-allow-headers: "Content-Type, Authorization, X-Requested-With, X-Apollo-Tracing"
+  
+  # Development playground (always enabled)
+  - match:
+    - uri:
+        exact: "/playground"
+    - uri:
+        exact: "/"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+    timeout: 30s
+    headers:
+      request:
+        add:
+          x-environment: "development"
+          x-enable-playground: "true"
+  
+  # Development subscriptions
+  - match:
+    - uri:
+        exact: "/graphql"
+    - headers:
+        upgrade:
+          exact: "websocket"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+    timeout: 0s
+    headers:
+      request:
+        add:
+          x-environment: "development"
+
+---
+# GraphQL Federation VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fdr-graphql-federation-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql-federation
+spec:
+  hosts:
+  - federation.freedeepresearch.org
+  gateways:
+  - fdr-graphql-federation-gateway
+  http:
+  # Schema registry endpoint
+  - match:
+    - uri:
+        prefix: "/schema-registry/"
+    route:
+    - destination:
+        host: schema-registry-service
+        port:
+          number: 8080
+    timeout: 30s
+    headers:
+      request:
+        add:
+          x-federation-registry: "true"
+  
+  # Federation gateway endpoint
+  - match:
+    - uri:
+        exact: "/graphql"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+        subset: federation-handlers
+    timeout: 60s
+    retries:
+      attempts: 2
+      perTryTimeout: 30s
+    headers:
+      request:
+        add:
+          x-federation-gateway: "true"
+  
+  # Service discovery endpoint
+  - match:
+    - uri:
+        prefix: "/services/"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+        subset: federation-handlers
+    timeout: 30s
+    headers:
+      request:
+        add:
+          x-service-discovery: "true"
+
+---
+# Internal GraphQL VirtualService (for service-to-service communication)
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fdr-graphql-internal-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql-internal
+spec:
+  hosts:
+  - graphql-gateway-service
+  - graphql-gateway-service.free-deep-research.svc.cluster.local
+  http:
+  # Internal GraphQL queries (from other services)
+  - match:
+    - uri:
+        exact: "/graphql"
+    - headers:
+        x-internal-request:
+          exact: "true"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+        subset: internal-handlers
+    timeout: 30s
+    headers:
+      request:
+        add:
+          x-internal-graphql: "true"
+  
+  # Internal health checks
+  - match:
+    - uri:
+        exact: "/health"
+    - uri:
+        exact: "/ready"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 4000
+    timeout: 5s
+  
+  # Internal metrics
+  - match:
+    - uri:
+        exact: "/metrics"
+    route:
+    - destination:
+        host: graphql-gateway-service
+        port:
+          number: 9090
+    timeout: 10s
+
+---
+# GraphQL Load Balancing Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-load-balancing-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-virtualservice
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql-load-balancing
+data:
+  load-balancing.yaml: |
+    # GraphQL load balancing configuration
+    
+    # Query handlers (read operations)
+    query_handlers:
+      load_balancer: LEAST_CONN
+      connection_pool:
+        tcp:
+          max_connections: 200
+        http:
+          http1_max_pending_requests: 128
+          max_requests_per_connection: 20
+      circuit_breaker:
+        consecutive_errors: 5
+        interval: 30s
+        base_ejection_time: 30s
+        max_ejection_percent: 50
+    
+    # Subscription handlers (WebSocket connections)
+    subscription_handlers:
+      load_balancer: ROUND_ROBIN
+      connection_pool:
+        tcp:
+          max_connections: 1000
+          keep_alive:
+            time: 86400s  # 24 hours for WebSocket
+            interval: 60s
+        http:
+          http1_max_pending_requests: 50
+          max_requests_per_connection: 1
+      circuit_breaker:
+        consecutive_errors: 3
+        interval: 60s
+        base_ejection_time: 60s
+        max_ejection_percent: 30
+    
+    # Federation handlers (cross-service queries)
+    federation_handlers:
+      load_balancer: LEAST_CONN
+      connection_pool:
+        tcp:
+          max_connections: 100
+        http:
+          http1_max_pending_requests: 64
+          max_requests_per_connection: 10
+      circuit_breaker:
+        consecutive_errors: 3
+        interval: 30s
+        base_ejection_time: 30s
+        max_ejection_percent: 25
+    
+    # Schema handlers (schema introspection)
+    schema_handlers:
+      load_balancer: ROUND_ROBIN
+      connection_pool:
+        tcp:
+          max_connections: 50
+        http:
+          http1_max_pending_requests: 32
+          max_requests_per_connection: 5
+      circuit_breaker:
+        consecutive_errors: 5
+        interval: 60s
+        base_ejection_time: 60s
+        max_ejection_percent: 50
+    
+    # Internal handlers (service-to-service)
+    internal_handlers:
+      load_balancer: LEAST_CONN
+      connection_pool:
+        tcp:
+          max_connections: 100
+        http:
+          http1_max_pending_requests: 64
+          max_requests_per_connection: 15
+      circuit_breaker:
+        consecutive_errors: 3
+        interval: 30s
+        base_ejection_time: 30s
+        max_ejection_percent: 25

@@ -1,0 +1,420 @@
+# Cloudflare CDN Configuration for Free Deep Research System
+# Phase 4.5: Serverless & Edge Computing
+
+# Zone configuration
+zone:
+  name: "freedeepresearch.org"
+  plan: "pro"  # Pro plan for advanced features
+  settings:
+    # Security settings
+    security_level: "medium"
+    challenge_ttl: 1800
+    browser_check: "on"
+    hotlink_protection: "on"
+    
+    # Performance settings
+    minify:
+      css: "on"
+      html: "on" 
+      js: "on"
+    
+    # Caching settings
+    cache_level: "aggressive"
+    browser_cache_ttl: 31536000  # 1 year
+    edge_cache_ttl: 7200         # 2 hours
+    
+    # SSL/TLS settings
+    ssl: "flexible"
+    tls_1_3: "on"
+    automatic_https_rewrites: "on"
+    always_use_https: "on"
+    
+    # HTTP/2 and HTTP/3
+    http2: "on"
+    http3: "on"
+    
+    # Compression
+    brotli: "on"
+    
+    # IPv6
+    ipv6: "on"
+    
+    # Development mode
+    development_mode: "off"
+
+# DNS records
+dns_records:
+  # Main application
+  - type: "A"
+    name: "app"
+    content: "104.16.123.45"  # Replace with actual IP
+    ttl: 300
+    proxied: true
+  
+  - type: "AAAA"
+    name: "app"
+    content: "2606:4700::6810:7b2d"  # Replace with actual IPv6
+    ttl: 300
+    proxied: true
+  
+  # GraphQL API
+  - type: "A"
+    name: "graphql"
+    content: "104.16.123.45"
+    ttl: 300
+    proxied: true
+  
+  - type: "A"
+    name: "api-v4"
+    content: "104.16.123.45"
+    ttl: 300
+    proxied: true
+  
+  # Regional endpoints
+  - type: "A"
+    name: "us-east"
+    content: "104.16.123.46"  # US East origin
+    ttl: 300
+    proxied: true
+  
+  - type: "A"
+    name: "us-west"
+    content: "104.16.123.47"  # US West origin
+    ttl: 300
+    proxied: true
+  
+  - type: "A"
+    name: "eu-west"
+    content: "104.16.123.48"  # EU West origin
+    ttl: 300
+    proxied: true
+  
+  - type: "A"
+    name: "ap-southeast"
+    content: "104.16.123.49"  # AP Southeast origin
+    ttl: 300
+    proxied: true
+  
+  # Development environments
+  - type: "A"
+    name: "dev"
+    content: "104.16.123.50"
+    ttl: 300
+    proxied: true
+  
+  - type: "A"
+    name: "staging"
+    content: "104.16.123.51"
+    ttl: 300
+    proxied: true
+  
+  # WebSocket endpoints
+  - type: "A"
+    name: "ws"
+    content: "104.16.123.45"
+    ttl: 300
+    proxied: true
+  
+  # CDN assets
+  - type: "CNAME"
+    name: "cdn"
+    content: "app.freedeepresearch.org"
+    ttl: 300
+    proxied: true
+  
+  # Status page
+  - type: "A"
+    name: "status"
+    content: "104.16.123.52"
+    ttl: 300
+    proxied: true
+
+# Page Rules for caching and performance
+page_rules:
+  # Static assets - aggressive caching
+  - targets:
+      - "*.freedeepresearch.org/*.js"
+      - "*.freedeepresearch.org/*.css"
+      - "*.freedeepresearch.org/*.png"
+      - "*.freedeepresearch.org/*.jpg"
+      - "*.freedeepresearch.org/*.jpeg"
+      - "*.freedeepresearch.org/*.gif"
+      - "*.freedeepresearch.org/*.svg"
+      - "*.freedeepresearch.org/*.ico"
+      - "*.freedeepresearch.org/*.woff"
+      - "*.freedeepresearch.org/*.woff2"
+      - "*.freedeepresearch.org/*.ttf"
+      - "*.freedeepresearch.org/*.eot"
+    actions:
+      cache_level: "cache_everything"
+      edge_cache_ttl: 31536000  # 1 year
+      browser_cache_ttl: 31536000
+      
+  # API responses - short caching
+  - targets:
+      - "*.freedeepresearch.org/api/config*"
+      - "*.freedeepresearch.org/api/templates*"
+      - "*.freedeepresearch.org/api/models*"
+      - "*.freedeepresearch.org/api/marketplace*"
+    actions:
+      cache_level: "cache_everything"
+      edge_cache_ttl: 300  # 5 minutes
+      browser_cache_ttl: 300
+      
+  # GraphQL queries - minimal caching
+  - targets:
+      - "graphql.freedeepresearch.org/graphql*"
+      - "api-v4.freedeepresearch.org/graphql*"
+    actions:
+      cache_level: "bypass"
+      disable_performance: false
+      
+  # WebSocket connections - bypass cache
+  - targets:
+      - "ws.freedeepresearch.org/*"
+    actions:
+      cache_level: "bypass"
+      disable_performance: false
+      
+  # Development environments - bypass cache
+  - targets:
+      - "dev.freedeepresearch.org/*"
+      - "staging.freedeepresearch.org/*"
+    actions:
+      cache_level: "bypass"
+      development_mode: "on"
+      
+  # Admin and sensitive areas - bypass cache
+  - targets:
+      - "*.freedeepresearch.org/admin*"
+      - "*.freedeepresearch.org/auth*"
+    actions:
+      cache_level: "bypass"
+      security_level: "high"
+
+# Load Balancing configuration
+load_balancing:
+  pools:
+    # Main application pool
+    - name: "main-app-pool"
+      description: "Main application servers"
+      enabled: true
+      minimum_origins: 2
+      origins:
+        - name: "us-east-origin"
+          address: "us-east.freedeepresearch.org"
+          enabled: true
+          weight: 1.0
+        - name: "us-west-origin"
+          address: "us-west.freedeepresearch.org"
+          enabled: true
+          weight: 1.0
+        - name: "eu-west-origin"
+          address: "eu-west.freedeepresearch.org"
+          enabled: true
+          weight: 1.0
+        - name: "ap-southeast-origin"
+          address: "ap-southeast.freedeepresearch.org"
+          enabled: true
+          weight: 1.0
+      
+      # Health checks
+      monitor:
+        type: "https"
+        method: "GET"
+        path: "/health"
+        expected_codes: "200"
+        interval: 60
+        retries: 2
+        timeout: 5
+        
+    # GraphQL API pool
+    - name: "graphql-pool"
+      description: "GraphQL API servers"
+      enabled: true
+      minimum_origins: 2
+      origins:
+        - name: "graphql-us-east"
+          address: "graphql-us-east.freedeepresearch.org"
+          enabled: true
+          weight: 1.0
+        - name: "graphql-us-west"
+          address: "graphql-us-west.freedeepresearch.org"
+          enabled: true
+          weight: 1.0
+        - name: "graphql-eu-west"
+          address: "graphql-eu-west.freedeepresearch.org"
+          enabled: true
+          weight: 1.0
+        - name: "graphql-ap-southeast"
+          address: "graphql-ap-southeast.freedeepresearch.org"
+          enabled: true
+          weight: 1.0
+      
+      monitor:
+        type: "https"
+        method: "POST"
+        path: "/graphql"
+        expected_codes: "200"
+        interval: 60
+        retries: 2
+        timeout: 10
+        header:
+          "Content-Type": "application/json"
+        data: '{"query":"query { __schema { queryType { name } } }"}'
+
+  # Load balancers
+  load_balancers:
+    - name: "main-app-lb"
+      default_pools: ["main-app-pool"]
+      fallback_pool: "main-app-pool"
+      region_pools:
+        WNAM: ["main-app-pool"]  # Western North America
+        ENAM: ["main-app-pool"]  # Eastern North America
+        WEU: ["main-app-pool"]   # Western Europe
+        EEU: ["main-app-pool"]   # Eastern Europe
+        SEAS: ["main-app-pool"]  # Southeast Asia
+        NEA: ["main-app-pool"]   # Northeast Asia
+      
+    - name: "graphql-lb"
+      default_pools: ["graphql-pool"]
+      fallback_pool: "graphql-pool"
+      region_pools:
+        WNAM: ["graphql-pool"]
+        ENAM: ["graphql-pool"]
+        WEU: ["graphql-pool"]
+        EEU: ["graphql-pool"]
+        SEAS: ["graphql-pool"]
+        NEA: ["graphql-pool"]
+
+# Rate Limiting rules
+rate_limiting:
+  rules:
+    # API rate limiting
+    - match: "api.freedeepresearch.org/api/*"
+      threshold: 1000
+      period: 60
+      action: "challenge"
+      
+    # GraphQL rate limiting
+    - match: "graphql.freedeepresearch.org/graphql"
+      threshold: 500
+      period: 60
+      action: "challenge"
+      
+    # Authentication endpoints
+    - match: "*.freedeepresearch.org/auth/*"
+      threshold: 100
+      period: 60
+      action: "block"
+      
+    # Admin endpoints
+    - match: "*.freedeepresearch.org/admin/*"
+      threshold: 50
+      period: 60
+      action: "block"
+
+# Firewall rules
+firewall:
+  rules:
+    # Block known bad IPs
+    - expression: "(ip.src in $bad_ips)"
+      action: "block"
+      
+    # Challenge suspicious user agents
+    - expression: "(http.user_agent contains \"bot\" and not http.user_agent contains \"Googlebot\")"
+      action: "challenge"
+      
+    # Block requests without proper headers
+    - expression: "(not http.referer contains \"freedeepresearch.org\" and http.request.uri.path contains \"/api/\")"
+      action: "challenge"
+      
+    # Allow legitimate crawlers
+    - expression: "(http.user_agent contains \"Googlebot\" or http.user_agent contains \"Bingbot\")"
+      action: "allow"
+
+# Workers configuration
+workers:
+  routes:
+    - pattern: "*.freedeepresearch.org/*"
+      script: "edge-worker"
+      
+  # KV namespaces
+  kv_namespaces:
+    - name: "RATE_LIMIT_KV"
+      title: "Rate Limiting Data"
+      
+    - name: "CACHE_KV"
+      title: "Edge Cache Data"
+      
+    - name: "CONFIG_KV"
+      title: "Configuration Data"
+
+# Analytics and monitoring
+analytics:
+  web_analytics: true
+  
+  # Custom events
+  custom_events:
+    - name: "graphql_query"
+      sample_rate: 1.0
+      
+    - name: "api_request"
+      sample_rate: 0.1
+      
+    - name: "user_login"
+      sample_rate: 1.0
+
+# Security headers
+security_headers:
+  # Content Security Policy
+  content_security_policy:
+    default_src: "'self'"
+    script_src: "'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net"
+    style_src: "'self' 'unsafe-inline' https://fonts.googleapis.com"
+    font_src: "'self' https://fonts.gstatic.com"
+    img_src: "'self' data: https:"
+    connect_src: "'self' https://api.freedeepresearch.org https://graphql.freedeepresearch.org wss://ws.freedeepresearch.org"
+    
+  # Other security headers
+  strict_transport_security:
+    max_age: 31536000
+    include_subdomains: true
+    preload: true
+    
+  x_frame_options: "DENY"
+  x_content_type_options: "nosniff"
+  referrer_policy: "strict-origin-when-cross-origin"
+  permissions_policy: "geolocation=(), microphone=(), camera=()"
+
+# Cache purging configuration
+cache_purge:
+  # Automatic purging triggers
+  triggers:
+    - event: "deployment"
+      patterns: ["*.js", "*.css", "*.html"]
+      
+    - event: "config_change"
+      patterns: ["/api/config*"]
+      
+    - event: "content_update"
+      patterns: ["/api/templates*", "/api/models*"]
+
+# Monitoring and alerting
+monitoring:
+  alerts:
+    - name: "high_error_rate"
+      condition: "error_rate > 5%"
+      duration: "5m"
+      
+    - name: "high_latency"
+      condition: "p95_latency > 2000ms"
+      duration: "5m"
+      
+    - name: "origin_down"
+      condition: "origin_health < 50%"
+      duration: "1m"
+      
+    - name: "ddos_attack"
+      condition: "request_rate > 10000/min"
+      duration: "1m"

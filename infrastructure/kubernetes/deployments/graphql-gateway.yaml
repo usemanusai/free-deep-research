@@ -1,0 +1,443 @@
+# GraphQL Gateway Deployment for Free Deep Research System
+# Phase 4.4: API Gateway & GraphQL
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: graphql-gateway-secret
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+type: Opaque
+data:
+  # Base64 encoded values - replace with actual values
+  jwt-secret: Z3JhcGhxbF9qd3Rfc2VjcmV0X2NoYW5nZV9tZQ==  # graphql_jwt_secret_change_me
+  api-secret: Z3JhcGhxbF9hcGlfc2VjcmV0X2NoYW5nZV9tZQ==  # graphql_api_secret_change_me
+  federation-key: ZmVkZXJhdGlvbl9rZXlfY2hhbmdlX21l  # federation_key_change_me
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-gateway-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  config.yaml: |
+    # GraphQL Gateway Configuration
+    
+    server:
+      host: "0.0.0.0"
+      port: 4000
+      workers: 4
+      max_connections: 2000
+      keep_alive: 75
+      timeout: 60
+      enable_cors: true
+      cors_origins: ["https://app.freedeepresearch.org", "https://dev.freedeepresearch.org"]
+    
+    graphql:
+      enable_playground: true
+      enable_introspection: true
+      max_query_depth: 15
+      max_query_complexity: 1000
+      enable_subscriptions: true
+      subscription_keepalive: 30
+      enable_tracing: true
+      enable_caching: true
+      cache_ttl: 300
+      enable_query_validation: true
+      enable_persisted_queries: true
+    
+    database:
+      url: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+      max_connections: 50
+      min_connections: 10
+      connection_timeout: 30
+      idle_timeout: 600
+      max_lifetime: 1800
+    
+    redis:
+      url: "redis://:$(REDIS_PASSWORD)@redis-service:6379"
+      max_connections: 20
+      connection_timeout: 5
+      command_timeout: 10
+      pool_size: 30
+    
+    auth:
+      jwt_secret: "$(JWT_SECRET)"
+      token_expiry: 3600
+      refresh_token_expiry: 604800
+      enable_refresh_tokens: true
+      enable_session_management: true
+    
+    rate_limiting:
+      requests_per_minute: 1000
+      burst_size: 2000
+      enable_per_user_limits: true
+      enable_query_complexity_limits: true
+      complexity_limit: 1000
+      depth_limit: 15
+    
+    federation:
+      enable_federation: true
+      gateway_url: "https://graphql.freedeepresearch.org"
+      service_name: "free-deep-research-gateway"
+      service_url: "http://graphql-gateway-service:4000/graphql"
+      schema_registry_url: "http://schema-registry:8080"
+      enable_schema_composition: true
+      enable_query_planning: true
+    
+    monitoring:
+      enable_metrics: true
+      metrics_port: 9090
+      enable_tracing: true
+      tracing_endpoint: "http://jaeger-collector:14268/api/traces"
+      enable_logging: true
+      log_level: "info"
+      enable_query_logging: true
+      slow_query_threshold: 1000
+    
+    security:
+      enable_query_whitelist: false
+      enable_introspection_auth: true
+      enable_playground_auth: false
+      max_request_size: 10485760  # 10MB
+      enable_csrf_protection: true
+      enable_request_validation: true
+    
+    caching:
+      enable_response_caching: true
+      default_cache_ttl: 300
+      max_cache_size: 1073741824  # 1GB
+      enable_query_result_caching: true
+      enable_dataloader_caching: true
+    
+    subscriptions:
+      enable_subscriptions: true
+      max_subscriptions_per_connection: 100
+      subscription_timeout: 300
+      enable_subscription_auth: true
+      keepalive_interval: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphql-gateway-service
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4000
+    targetPort: 4000
+    protocol: TCP
+    name: graphql
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/component: api-gateway
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphql-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    app.kubernetes.io/version: "4.4.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: graphql-gateway
+      app.kubernetes.io/component: api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: graphql-gateway
+        app.kubernetes.io/component: api-gateway
+        app.kubernetes.io/part-of: free-deep-research-system
+        app.kubernetes.io/version: "4.4.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: graphql-gateway
+        image: freeresearch/graphql-gateway:4.4.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 4000
+          name: graphql
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_ENV
+          value: "production"
+        - name: RUST_LOG
+          value: "info,graphql_gateway=debug"
+        - name: RUST_BACKTRACE
+          value: "1"
+        
+        # Database configuration
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-db
+        
+        # Redis configuration
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: redis-password
+        
+        # GraphQL Gateway secrets
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: graphql-gateway-secret
+              key: jwt-secret
+        - name: API_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: graphql-gateway-secret
+              key: api-secret
+        - name: FEDERATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: graphql-gateway-secret
+              key: federation-key
+        
+        # Service URLs
+        - name: BACKEND_SERVICE_URL
+          value: "http://backend-service:8080"
+        - name: CONFIG_PATH
+          value: "/app/config/config.yaml"
+        
+        volumeMounts:
+        - name: graphql-config
+          mountPath: /app/config
+        - name: temp-storage
+          mountPath: /tmp
+        - name: cache-storage
+          mountPath: /app/cache
+        
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 4000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+      
+      volumes:
+      - name: graphql-config
+        configMap:
+          name: graphql-gateway-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: cache-storage
+        emptyDir:
+          sizeLimit: 2Gi
+      
+      # Node affinity for API gateway workloads
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - api-gateway
+          - weight: 50
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+        
+        # Anti-affinity to spread replicas across nodes
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - graphql-gateway
+              topologyKey: kubernetes.io/hostname
+      
+      # Toleration for dedicated API gateway nodes
+      tolerations:
+      - key: "api-gateway"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+
+---
+# GraphQL Gateway Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: graphql-gateway-metrics
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: graphql-gateway
+      app.kubernetes.io/component: api-gateway
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# GraphQL Gateway HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: graphql-gateway-hpa
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: graphql-gateway
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  # CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metrics - GraphQL requests per second
+  - type: Pods
+    pods:
+      metric:
+        name: graphql_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "200"
+  # Custom metrics - GraphQL query complexity
+  - type: Pods
+    pods:
+      metric:
+        name: graphql_query_complexity_avg
+      target:
+        type: AverageValue
+        averageValue: "500"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 4
+        periodSeconds: 60
+      selectPolicy: Max

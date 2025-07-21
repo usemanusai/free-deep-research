@@ -1,0 +1,375 @@
+# Knative Serving Installation for Free Deep Research System
+# Phase 4.5: Serverless & Edge Computing
+
+# Knative Serving CRDs
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+
+---
+# Knative Serving Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-domain
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  # Configure custom domain for Knative services
+  freedeepresearch.org: |
+    selector:
+      app.kubernetes.io/part-of: free-deep-research-system
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-network
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  # Configure Istio integration
+  ingress.class: "istio.ingress.networking.knative.dev"
+  # Configure domain template
+  domainTemplate: "{{.Name}}.{{.Namespace}}.{{.Domain}}"
+  # Configure auto-TLS
+  autoTLS: "Enabled"
+  httpProtocol: "Redirected"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-deployment
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  # Configure deployment defaults
+  queueSidecarImage: gcr.io/knative-releases/knative.dev/serving/cmd/queue@sha256:latest
+  # Configure resource requirements
+  queueSidecarCPURequest: "25m"
+  queueSidecarMemoryRequest: "50Mi"
+  queueSidecarCPULimit: "1000m"
+  queueSidecarMemoryLimit: "200Mi"
+  # Configure revision timeout
+  revisionTimeoutSeconds: "300"
+  # Configure max scale
+  maxScale: "1000"
+  # Configure min scale
+  minScale: "0"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-autoscaler
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  # Configure autoscaling parameters
+  max-scale-up-rate: "1000"
+  max-scale-down-rate: "2"
+  scale-to-zero-grace-period: "30s"
+  scale-to-zero-pod-retention-period: "0s"
+  stable-window: "60s"
+  panic-window-percentage: "10"
+  panic-threshold-percentage: "200"
+  # Configure concurrency
+  container-concurrency-target-default: "100"
+  container-concurrency-target-percentage: "70"
+  # Configure metrics
+  requests-per-second-target-default: "200"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-gc
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  # Configure garbage collection
+  stale-revision-create-delay: "24h"
+  stale-revision-timeout: "15h"
+  stale-revision-minimum-generations: "1"
+  stale-revision-lastpinned-debounce: "5h"
+
+---
+# Knative Serving Controller
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: knative-serving
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: controller
+  template:
+    metadata:
+      labels:
+        app: controller
+        app.kubernetes.io/name: controller
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/part-of: knative-serving
+    spec:
+      serviceAccountName: controller
+      containers:
+      - name: controller
+        image: gcr.io/knative-releases/knative.dev/serving/cmd/controller@sha256:latest
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+        env:
+        - name: SYSTEM_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONFIG_LOGGING_NAME
+          value: config-logging
+        - name: CONFIG_OBSERVABILITY_NAME
+          value: config-observability
+        - name: METRICS_DOMAIN
+          value: knative.dev/internal/serving
+        ports:
+        - name: metrics
+          containerPort: 9090
+        - name: profiling
+          containerPort: 8008
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - all
+
+---
+# Knative Serving Webhook
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: webhook
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/part-of: knative-serving
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webhook
+  template:
+    metadata:
+      labels:
+        app: webhook
+        app.kubernetes.io/name: webhook
+        app.kubernetes.io/component: webhook
+        app.kubernetes.io/part-of: knative-serving
+    spec:
+      serviceAccountName: controller
+      containers:
+      - name: webhook
+        image: gcr.io/knative-releases/knative.dev/serving/cmd/webhook@sha256:latest
+        resources:
+          requests:
+            cpu: 20m
+            memory: 20Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
+        env:
+        - name: SYSTEM_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONFIG_LOGGING_NAME
+          value: config-logging
+        - name: CONFIG_OBSERVABILITY_NAME
+          value: config-observability
+        - name: WEBHOOK_NAME
+          value: webhook
+        - name: WEBHOOK_PORT
+          value: "8443"
+        - name: METRICS_DOMAIN
+          value: knative.dev/serving
+        ports:
+        - name: metrics
+          containerPort: 9090
+        - name: profiling
+          containerPort: 8008
+        - name: https-webhook
+          containerPort: 8443
+        readinessProbe:
+          periodSeconds: 1
+          httpGet:
+            scheme: HTTPS
+            port: 8443
+            httpHeaders:
+            - name: k-kubelet-probe
+              value: "webhook"
+        livenessProbe:
+          periodSeconds: 1
+          httpGet:
+            scheme: HTTPS
+            port: 8443
+            httpHeaders:
+            - name: k-kubelet-probe
+              value: "webhook"
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - all
+
+---
+# Knative Serving Autoscaler
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autoscaler
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: autoscaler
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/part-of: knative-serving
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: autoscaler
+  template:
+    metadata:
+      labels:
+        app: autoscaler
+        app.kubernetes.io/name: autoscaler
+        app.kubernetes.io/component: autoscaler
+        app.kubernetes.io/part-of: knative-serving
+    spec:
+      serviceAccountName: controller
+      containers:
+      - name: autoscaler
+        image: gcr.io/knative-releases/knative.dev/serving/cmd/autoscaler@sha256:latest
+        resources:
+          requests:
+            cpu: 30m
+            memory: 40Mi
+          limits:
+            cpu: 300m
+            memory: 400Mi
+        env:
+        - name: SYSTEM_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONFIG_LOGGING_NAME
+          value: config-logging
+        - name: CONFIG_OBSERVABILITY_NAME
+          value: config-observability
+        - name: METRICS_DOMAIN
+          value: knative.dev/serving
+        ports:
+        - name: metrics
+          containerPort: 9090
+        - name: profiling
+          containerPort: 8008
+        - name: websocket
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            port: 8080
+        livenessProbe:
+          httpGet:
+            port: 8080
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - all
+
+---
+# Service Account for Knative Serving
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: controller
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+
+---
+# ClusterRole for Knative Serving
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: knative-serving-controller
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+rules:
+- apiGroups: [""]
+  resources: ["pods", "namespaces", "secrets", "configmaps", "endpoints", "services", "events", "serviceaccounts"]
+  verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "deployments/finalizers"]
+  verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+  verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+- apiGroups: ["serving.knative.dev"]
+  resources: ["*", "*/status", "*/finalizers"]
+  verbs: ["get", "list", "create", "update", "delete", "deletecollection", "patch", "watch"]
+- apiGroups: ["networking.istio.io"]
+  resources: ["virtualservices"]
+  verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+
+---
+# ClusterRoleBinding for Knative Serving
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: knative-serving-controller
+  labels:
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+subjects:
+- kind: ServiceAccount
+  name: controller
+  namespace: knative-serving
+roleRef:
+  kind: ClusterRole
+  name: knative-serving-controller
+  apiGroup: rbac.authorization.k8s.io

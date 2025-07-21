@@ -1,0 +1,417 @@
+# Research Processor Serverless Function
+# Phase 4.5: Serverless & Edge Computing
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: research-processor
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: research-processor
+    app.kubernetes.io/component: serverless-function
+    app.kubernetes.io/part-of: free-deep-research-system
+  annotations:
+    # Knative serving annotations
+    serving.knative.dev/creator: "free-deep-research-system"
+    serving.knative.dev/lastModifier: "free-deep-research-system"
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: research-processor
+        app.kubernetes.io/component: serverless-function
+        app.kubernetes.io/part-of: free-deep-research-system
+      annotations:
+        # Autoscaling configuration
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "100"
+        autoscaling.knative.dev/target: "10"
+        autoscaling.knative.dev/targetUtilizationPercentage: "70"
+        autoscaling.knative.dev/scaleToZeroGracePeriod: "30s"
+        autoscaling.knative.dev/scaleDownDelay: "0s"
+        autoscaling.knative.dev/window: "60s"
+        
+        # Resource configuration
+        autoscaling.knative.dev/class: "kpa.autoscaling.knative.dev"
+        autoscaling.knative.dev/metric: "concurrency"
+        
+        # Networking configuration
+        networking.knative.dev/ingress.class: "istio.ingress.networking.knative.dev"
+        
+        # Observability
+        sidecar.istio.io/inject: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Container concurrency
+      containerConcurrency: 10
+      
+      # Timeout configuration
+      timeoutSeconds: 1800  # 30 minutes for long-running research tasks
+      
+      # Response start timeout
+      responseStartTimeoutSeconds: 60
+      
+      # Idle timeout
+      idleTimeoutSeconds: 300  # 5 minutes
+      
+      containers:
+      - name: research-processor
+        image: freeresearch/research-processor:4.5.0
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - containerPort: 8080
+          name: http1
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        
+        env:
+        # Application configuration
+        - name: RUST_ENV
+          value: "production"
+        - name: RUST_LOG
+          value: "info,research_processor=debug"
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: PORT
+          value: "8080"
+        - name: METRICS_PORT
+          value: "9090"
+        
+        # Function configuration
+        - name: MAX_PROCESSING_TIME
+          value: "1800"
+        - name: MAX_CONCURRENT_JOBS
+          value: "10"
+        - name: ENABLE_CACHING
+          value: "true"
+        - name: CACHE_TTL
+          value: "3600"
+        
+        # Database configuration
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: database-url
+        
+        # Redis configuration
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: redis-url
+        
+        # AI service configuration
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-service-secret
+              key: openai-api-key
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-service-secret
+              key: anthropic-api-key
+        
+        # Event store configuration
+        - name: EVENT_STORE_URL
+          value: "http://backend-service:8080/events"
+        
+        # GraphQL endpoint
+        - name: GRAPHQL_ENDPOINT
+          value: "http://graphql-gateway-service:4000/graphql"
+        
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volume mounts for temporary storage
+        volumeMounts:
+        - name: tmp-storage
+          mountPath: /tmp
+        - name: cache-storage
+          mountPath: /app/cache
+      
+      volumes:
+      - name: tmp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: cache-storage
+        emptyDir:
+          sizeLimit: 2Gi
+      
+      # Service account
+      serviceAccountName: fdr-service-account
+      
+      # Node selection
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      
+      # Tolerations for serverless workloads
+      tolerations:
+      - key: "serverless"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      
+      # Affinity for compute-optimized nodes
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - compute-optimized
+          - weight: 50
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/instance-type
+                operator: In
+                values:
+                - c5.large
+                - c5.xlarge
+                - c5.2xlarge
+
+---
+# Traffic configuration for gradual rollout
+apiVersion: serving.knative.dev/v1
+kind: Configuration
+metadata:
+  name: research-processor-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: research-processor
+    app.kubernetes.io/component: serverless-function
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: research-processor
+        app.kubernetes.io/version: "4.5.0"
+    spec:
+      containers:
+      - image: freeresearch/research-processor:4.5.0
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+
+---
+# Route configuration for traffic splitting
+apiVersion: serving.knative.dev/v1
+kind: Route
+metadata:
+  name: research-processor-route
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: research-processor
+    app.kubernetes.io/component: serverless-function
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  traffic:
+  - revisionName: research-processor-config-00001
+    percent: 100
+    tag: current
+  - latestRevision: true
+    percent: 0
+    tag: latest
+
+---
+# Horizontal Pod Autoscaler for Knative (KPA)
+apiVersion: autoscaling.knative.dev/v1alpha1
+kind: PodAutoscaler
+metadata:
+  name: research-processor-kpa
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: research-processor
+    app.kubernetes.io/component: serverless-function
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  scaleTargetRef:
+    apiVersion: serving.knative.dev/v1
+    kind: Service
+    name: research-processor
+  
+  # Scaling configuration
+  minScale: 0
+  maxScale: 100
+  
+  # Target metrics
+  targetUtilizationPercentage: 70
+  
+  # Scaling behavior
+  scaleUpPolicy:
+    stabilizationWindowSeconds: 60
+    policies:
+    - type: Percent
+      value: 100
+      periodSeconds: 60
+    - type: Pods
+      value: 10
+      periodSeconds: 60
+    selectPolicy: Max
+  
+  scaleDownPolicy:
+    stabilizationWindowSeconds: 300
+    policies:
+    - type: Percent
+      value: 10
+      periodSeconds: 60
+    - type: Pods
+      value: 2
+      periodSeconds: 60
+    selectPolicy: Min
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: research-processor-metrics
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: research-processor
+    app.kubernetes.io/component: serverless-function
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      serving.knative.dev/service: research-processor
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scheme: http
+
+---
+# Network Policy for Research Processor
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: research-processor-netpol
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: research-processor
+    app.kubernetes.io/component: serverless-function
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: research-processor
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow traffic from Knative activator
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: knative-serving
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Allow traffic from Istio gateway
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Allow metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: free-deep-research
+    ports:
+    - protocol: TCP
+      port: 9090
+  
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  
+  # Allow HTTPS outbound (for AI APIs)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  
+  # Allow database access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  
+  # Allow Redis access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  
+  # Allow GraphQL gateway access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: graphql-gateway
+    ports:
+    - protocol: TCP
+      port: 4000
