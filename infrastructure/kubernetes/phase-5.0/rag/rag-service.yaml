@@ -1,0 +1,306 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-service
+  namespace: free-deep-research
+  labels:
+    app: rag-service
+    component: rag-engine
+    phase: "5.0"
+    version: "1.0.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: rag-service
+  template:
+    metadata:
+      labels:
+        app: rag-service
+        component: rag-engine
+        phase: "5.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: rag-service
+        image: freeresearch/rag-service:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_ENV
+          value: "production"
+        - name: RUST_LOG
+          value: "info,rag_service=debug"
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: SERVER_PORT
+          value: "8080"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: QDRANT_URL
+          value: "http://qdrant-service:6333"
+        - name: EMBEDDING_SERVICE_URL
+          value: "http://embedding-service:8081"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-db
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: openai-api-key
+              optional: true
+        - name: HUGGINGFACE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: huggingface-api-key
+              optional: true
+        # RAG Configuration
+        - name: RAG_CHUNK_SIZE
+          value: "1000"
+        - name: RAG_CHUNK_OVERLAP
+          value: "200"
+        - name: RAG_MAX_CHUNKS
+          value: "10"
+        - name: RAG_SIMILARITY_THRESHOLD
+          value: "0.7"
+        - name: RAG_RERANK_ENABLED
+          value: "true"
+        - name: RAG_HYBRID_SEARCH_ENABLED
+          value: "true"
+        - name: RAG_CONVERSATION_MEMORY_ENABLED
+          value: "true"
+        - name: RAG_CITATION_TRACKING_ENABLED
+          value: "true"
+        # Performance settings
+        - name: RAG_CACHE_TTL_SECONDS
+          value: "3600"
+        - name: RAG_MAX_CONCURRENT_QUERIES
+          value: "100"
+        - name: RAG_QUERY_TIMEOUT_SECONDS
+          value: "30"
+        volumeMounts:
+        - name: rag-config
+          mountPath: /app/config
+          readOnly: true
+        - name: temp-storage
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: rag-config
+        configMap:
+          name: rag-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - rag-service
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-service
+  namespace: free-deep-research
+  labels:
+    app: rag-service
+    component: rag-engine
+    phase: "5.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: rag-service
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-config
+  namespace: free-deep-research
+  labels:
+    app: rag-service
+    component: rag-engine
+    phase: "5.0"
+data:
+  config.yaml: |
+    # RAG Service Configuration
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      metrics_port: 9090
+      
+    # Vector Database Configuration
+    vector_db:
+      url: "http://qdrant-service:6333"
+      collection_name: "documents"
+      timeout_seconds: 30
+      max_retries: 3
+      
+    # Embedding Configuration
+    embeddings:
+      service_url: "http://embedding-service:8081"
+      model: "text-embedding-3-large"
+      dimensions: 1536
+      batch_size: 100
+      timeout_seconds: 30
+      
+    # Document Processing
+    document_processing:
+      chunk_size: 1000
+      chunk_overlap: 200
+      max_chunks_per_document: 1000
+      supported_formats: ["txt", "md", "pdf", "docx", "html"]
+      
+    # RAG Query Processing
+    rag:
+      max_chunks: 10
+      similarity_threshold: 0.7
+      rerank_enabled: true
+      rerank_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+      hybrid_search_enabled: true
+      keyword_weight: 0.3
+      semantic_weight: 0.7
+      
+    # Conversation Memory
+    conversation:
+      enabled: true
+      max_history_length: 10
+      memory_decay_factor: 0.9
+      context_window_size: 4000
+      
+    # Citation Tracking
+    citations:
+      enabled: true
+      max_citations_per_response: 5
+      include_snippets: true
+      snippet_length: 200
+      
+    # Caching
+    cache:
+      enabled: true
+      ttl_seconds: 3600
+      max_size_mb: 500
+      
+    # Performance
+    performance:
+      max_concurrent_queries: 100
+      query_timeout_seconds: 30
+      batch_processing_enabled: true
+      batch_size: 10
+      
+    # Monitoring
+    monitoring:
+      metrics_enabled: true
+      tracing_enabled: true
+      log_level: "info"
+      
+  rerank-models.yaml: |
+    # Re-ranking model configurations
+    models:
+      - name: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        type: "cross_encoder"
+        max_length: 512
+        batch_size: 32
+        device: "cpu"
+        
+      - name: "cross-encoder/ms-marco-MiniLM-L-12-v2"
+        type: "cross_encoder"
+        max_length: 512
+        batch_size: 16
+        device: "cpu"
+        
+      - name: "BAAI/bge-reranker-base"
+        type: "cross_encoder"
+        max_length: 512
+        batch_size: 32
+        device: "cpu"

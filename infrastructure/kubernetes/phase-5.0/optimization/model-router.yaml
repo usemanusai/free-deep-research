@@ -1,0 +1,372 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-router
+  namespace: free-deep-research
+  labels:
+    app: model-router
+    component: optimization
+    phase: "5.0"
+    version: "1.0.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: model-router
+  template:
+    metadata:
+      labels:
+        app: model-router
+        component: optimization
+        phase: "5.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9094"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: model-router
+        image: freeresearch/model-router:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8084
+          name: http
+          protocol: TCP
+        - containerPort: 9094
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_ENV
+          value: "production"
+        - name: RUST_LOG
+          value: "info,model_router=debug"
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: SERVER_PORT
+          value: "8084"
+        - name: METRICS_PORT
+          value: "9094"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+        - name: PROVIDER_GATEWAY_URL
+          value: "http://provider-gateway:8083"
+        - name: COST_OPTIMIZER_URL
+          value: "http://cost-optimizer:8085"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-db
+        # Router Configuration
+        - name: ROUTING_STRATEGY
+          value: "intelligent"  # simple, cost_optimized, performance_optimized, intelligent
+        - name: COMPLEXITY_ANALYSIS_ENABLED
+          value: "true"
+        - name: PERFORMANCE_TRACKING_ENABLED
+          value: "true"
+        - name: COST_AWARENESS_ENABLED
+          value: "true"
+        - name: FAILOVER_ENABLED
+          value: "true"
+        - name: LOAD_BALANCING_ENABLED
+          value: "true"
+        # Performance settings
+        - name: MAX_CONCURRENT_ROUTES
+          value: "500"
+        - name: ROUTING_TIMEOUT_SECONDS
+          value: "5"
+        - name: HEALTH_CHECK_INTERVAL_SECONDS
+          value: "30"
+        - name: METRICS_COLLECTION_INTERVAL_SECONDS
+          value: "10"
+        volumeMounts:
+        - name: router-config
+          mountPath: /app/config
+          readOnly: true
+        - name: temp-storage
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8084
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: router-config
+        configMap:
+          name: router-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - model-router
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-router
+  namespace: free-deep-research
+  labels:
+    app: model-router
+    component: optimization
+    phase: "5.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9094"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8084
+    targetPort: 8084
+    protocol: TCP
+    name: http
+  - port: 9094
+    targetPort: 9094
+    protocol: TCP
+    name: metrics
+  selector:
+    app: model-router
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: router-config
+  namespace: free-deep-research
+  labels:
+    app: model-router
+    component: optimization
+    phase: "5.0"
+data:
+  config.yaml: |
+    # Model Router Configuration
+    server:
+      host: "0.0.0.0"
+      port: 8084
+      metrics_port: 9094
+      
+    # Routing Strategy Configuration
+    routing:
+      strategy: "intelligent"  # simple, cost_optimized, performance_optimized, intelligent
+      
+      # Simple routing (round-robin)
+      simple:
+        enabled: false
+        
+      # Cost-optimized routing
+      cost_optimized:
+        enabled: true
+        max_cost_per_request: 0.01
+        prefer_free_models: true
+        cost_weight: 0.6
+        performance_weight: 0.4
+        
+      # Performance-optimized routing
+      performance_optimized:
+        enabled: true
+        max_latency_ms: 2000
+        min_throughput_rps: 10
+        performance_weight: 0.7
+        cost_weight: 0.3
+        
+      # Intelligent routing (ML-based)
+      intelligent:
+        enabled: true
+        complexity_analysis: true
+        performance_prediction: true
+        cost_prediction: true
+        user_preference_learning: true
+        
+    # Query Complexity Analysis
+    complexity_analysis:
+      enabled: true
+      factors:
+        - name: "token_count"
+          weight: 0.3
+          thresholds:
+            simple: 100
+            medium: 1000
+            complex: 4000
+            
+        - name: "query_type"
+          weight: 0.2
+          types:
+            simple: ["greeting", "basic_qa"]
+            medium: ["summarization", "translation"]
+            complex: ["reasoning", "code_generation", "analysis"]
+            
+        - name: "context_length"
+          weight: 0.2
+          thresholds:
+            simple: 500
+            medium: 2000
+            complex: 8000
+            
+        - name: "response_requirements"
+          weight: 0.3
+          requirements:
+            simple: ["short", "factual"]
+            medium: ["detailed", "structured"]
+            complex: ["creative", "analytical", "multi_step"]
+            
+    # Model Selection Rules
+    model_selection:
+      rules:
+        - condition: "complexity == 'simple' && cost_priority == 'high'"
+          models: ["ollama:llama3.1:8b", "groq:llama-3.1-8b-instant"]
+          
+        - condition: "complexity == 'simple' && performance_priority == 'high'"
+          models: ["groq:llama-3.1-8b-instant", "openai:gpt-4o-mini"]
+          
+        - condition: "complexity == 'medium'"
+          models: ["openai:gpt-4o-mini", "groq:mixtral-8x7b-32768", "together:llama-3.1-8b"]
+          
+        - condition: "complexity == 'complex'"
+          models: ["openai:gpt-4o", "groq:llama-3.1-70b-versatile", "together:llama-3.1-70b"]
+          
+        - condition: "task_type == 'code'"
+          models: ["ollama:codellama:7b", "openai:gpt-4o", "together:llama-3.1-70b"]
+          
+        - condition: "task_type == 'embedding'"
+          models: ["openai:text-embedding-3-large", "huggingface:bge-large-en-v1.5"]
+          
+    # Failover Configuration
+    failover:
+      enabled: true
+      max_retries: 3
+      retry_delay_ms: 1000
+      fallback_models:
+        - "ollama:llama3.1:8b"
+        - "ollama:mistral:7b"
+        
+    # Load Balancing
+    load_balancing:
+      enabled: true
+      strategy: "weighted_round_robin"
+      health_check_interval: 30
+      
+    # Performance Monitoring
+    monitoring:
+      enabled: true
+      metrics:
+        - "request_count"
+        - "response_time"
+        - "error_rate"
+        - "cost_per_request"
+        - "model_utilization"
+        - "complexity_distribution"
+        
+    # Caching
+    cache:
+      enabled: true
+      ttl_seconds: 1800
+      max_size_mb: 500
+      
+  routing-rules.yaml: |
+    # Advanced routing rules configuration
+    routing_rules:
+      # Cost-based routing
+      cost_rules:
+        - name: "free_first"
+          condition: "daily_budget_remaining < 10.0"
+          action: "prefer_free_models"
+          priority: 1
+          
+        - name: "cost_threshold"
+          condition: "estimated_cost > 0.005"
+          action: "use_cheaper_alternative"
+          priority: 2
+          
+      # Performance-based routing
+      performance_rules:
+        - name: "low_latency"
+          condition: "user_preference == 'speed'"
+          action: "prefer_fast_models"
+          priority: 1
+          
+        - name: "high_quality"
+          condition: "user_preference == 'quality'"
+          action: "prefer_large_models"
+          priority: 2
+          
+      # Context-based routing
+      context_rules:
+        - name: "long_context"
+          condition: "context_length > 32000"
+          action: "use_long_context_models"
+          models: ["openai:gpt-4o", "groq:llama-3.1-70b-versatile"]
+          
+        - name: "code_task"
+          condition: "task_type == 'code'"
+          action: "use_code_models"
+          models: ["ollama:codellama:7b", "openai:gpt-4o"]
+          
+      # Time-based routing
+      time_rules:
+        - name: "peak_hours"
+          condition: "hour >= 9 && hour <= 17"
+          action: "prefer_reliable_models"
+          
+        - name: "off_peak"
+          condition: "hour < 9 || hour > 17"
+          action: "prefer_cost_effective_models"

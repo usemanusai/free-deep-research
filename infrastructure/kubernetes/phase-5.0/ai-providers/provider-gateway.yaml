@@ -1,0 +1,412 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-gateway
+  namespace: free-deep-research
+  labels:
+    app: provider-gateway
+    component: ai-providers
+    phase: "5.0"
+    version: "1.0.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: provider-gateway
+  template:
+    metadata:
+      labels:
+        app: provider-gateway
+        component: ai-providers
+        phase: "5.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9093"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: provider-gateway
+        image: freeresearch/provider-gateway:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        - containerPort: 9093
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_ENV
+          value: "production"
+        - name: RUST_LOG
+          value: "info,provider_gateway=debug"
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: SERVER_PORT
+          value: "8083"
+        - name: METRICS_PORT
+          value: "9093"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-db
+        # AI Provider API Keys
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: openai-api-key
+              optional: true
+        - name: HUGGINGFACE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: huggingface-api-key
+              optional: true
+        - name: GROQ_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: groq-api-key
+              optional: true
+        - name: TOGETHER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: together-api-key
+              optional: true
+        - name: REPLICATE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: replicate-api-key
+              optional: true
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: anthropic-api-key
+              optional: true
+        # Local LLM Configuration
+        - name: OLLAMA_URL
+          value: "http://ollama-service:11434"
+        # Gateway Configuration
+        - name: DEFAULT_PROVIDER
+          value: "openai"
+        - name: FALLBACK_PROVIDER
+          value: "ollama"
+        - name: RATE_LIMIT_ENABLED
+          value: "true"
+        - name: COST_TRACKING_ENABLED
+          value: "true"
+        - name: LOAD_BALANCING_ENABLED
+          value: "true"
+        - name: CIRCUIT_BREAKER_ENABLED
+          value: "true"
+        # Performance settings
+        - name: MAX_CONCURRENT_REQUESTS
+          value: "200"
+        - name: REQUEST_TIMEOUT_SECONDS
+          value: "120"
+        - name: RETRY_ATTEMPTS
+          value: "3"
+        - name: CACHE_TTL_SECONDS
+          value: "3600"
+        volumeMounts:
+        - name: provider-config
+          mountPath: /app/config
+          readOnly: true
+        - name: temp-storage
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8083
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: provider-config
+        configMap:
+          name: provider-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - provider-gateway
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: provider-gateway
+  namespace: free-deep-research
+  labels:
+    app: provider-gateway
+    component: ai-providers
+    phase: "5.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9093"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8083
+    targetPort: 8083
+    protocol: TCP
+    name: http
+  - port: 9093
+    targetPort: 9093
+    protocol: TCP
+    name: metrics
+  selector:
+    app: provider-gateway
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ai-provider-secrets
+  namespace: free-deep-research
+  labels:
+    app: provider-gateway
+    component: ai-providers
+    phase: "5.0"
+type: Opaque
+data:
+  # Base64 encoded API keys (replace with actual keys)
+  openai-api-key: ""
+  huggingface-api-key: ""
+  groq-api-key: ""
+  together-api-key: ""
+  replicate-api-key: ""
+  anthropic-api-key: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: provider-config
+  namespace: free-deep-research
+  labels:
+    app: provider-gateway
+    component: ai-providers
+    phase: "5.0"
+data:
+  config.yaml: |
+    # AI Provider Gateway Configuration
+    server:
+      host: "0.0.0.0"
+      port: 8083
+      metrics_port: 9093
+      
+    # Provider Configurations
+    providers:
+      openai:
+        name: "OpenAI"
+        base_url: "https://api.openai.com/v1"
+        api_key_env: "OPENAI_API_KEY"
+        timeout: 120
+        max_retries: 3
+        rate_limit:
+          requests_per_minute: 3500
+          tokens_per_minute: 90000
+        models:
+          - name: "gpt-4o"
+            type: "chat"
+            context_length: 128000
+            cost_per_1k_tokens: 0.005
+          - name: "gpt-4o-mini"
+            type: "chat"
+            context_length: 128000
+            cost_per_1k_tokens: 0.00015
+          - name: "text-embedding-3-large"
+            type: "embedding"
+            dimensions: 1536
+            cost_per_1k_tokens: 0.00013
+            
+      huggingface:
+        name: "Hugging Face"
+        base_url: "https://api-inference.huggingface.co"
+        api_key_env: "HUGGINGFACE_API_KEY"
+        timeout: 120
+        max_retries: 3
+        rate_limit:
+          requests_per_minute: 1000
+        models:
+          - name: "meta-llama/Llama-3.1-8B-Instruct"
+            type: "chat"
+            context_length: 128000
+            cost_per_1k_tokens: 0.0
+          - name: "mistralai/Mistral-7B-Instruct-v0.3"
+            type: "chat"
+            context_length: 32768
+            cost_per_1k_tokens: 0.0
+            
+      groq:
+        name: "Groq"
+        base_url: "https://api.groq.com/openai/v1"
+        api_key_env: "GROQ_API_KEY"
+        timeout: 60
+        max_retries: 3
+        rate_limit:
+          requests_per_minute: 30
+          tokens_per_minute: 6000
+        models:
+          - name: "llama-3.1-70b-versatile"
+            type: "chat"
+            context_length: 131072
+            cost_per_1k_tokens: 0.00059
+          - name: "llama-3.1-8b-instant"
+            type: "chat"
+            context_length: 131072
+            cost_per_1k_tokens: 0.00005
+          - name: "mixtral-8x7b-32768"
+            type: "chat"
+            context_length: 32768
+            cost_per_1k_tokens: 0.00024
+            
+      together:
+        name: "Together AI"
+        base_url: "https://api.together.xyz/v1"
+        api_key_env: "TOGETHER_API_KEY"
+        timeout: 120
+        max_retries: 3
+        rate_limit:
+          requests_per_minute: 600
+        models:
+          - name: "meta-llama/Llama-3.1-8B-Instruct-Turbo"
+            type: "chat"
+            context_length: 131072
+            cost_per_1k_tokens: 0.00018
+          - name: "meta-llama/Llama-3.1-70B-Instruct-Turbo"
+            type: "chat"
+            context_length: 131072
+            cost_per_1k_tokens: 0.00088
+            
+      replicate:
+        name: "Replicate"
+        base_url: "https://api.replicate.com/v1"
+        api_key_env: "REPLICATE_API_KEY"
+        timeout: 300
+        max_retries: 3
+        rate_limit:
+          requests_per_minute: 100
+        models:
+          - name: "meta/llama-2-70b-chat"
+            type: "chat"
+            context_length: 4096
+            cost_per_1k_tokens: 0.00065
+            
+      ollama:
+        name: "Ollama (Local)"
+        base_url: "http://ollama-service:11434"
+        timeout: 120
+        max_retries: 3
+        rate_limit:
+          requests_per_minute: 1000
+        models:
+          - name: "llama3.1:8b"
+            type: "chat"
+            context_length: 128000
+            cost_per_1k_tokens: 0.0
+          - name: "mistral:7b"
+            type: "chat"
+            context_length: 32768
+            cost_per_1k_tokens: 0.0
+          - name: "codellama:7b"
+            type: "chat"
+            context_length: 16384
+            cost_per_1k_tokens: 0.0
+            
+    # Load Balancing Configuration
+    load_balancing:
+      enabled: true
+      strategy: "least_latency"  # round_robin, least_latency, cost_optimized
+      health_check_interval: 30
+      
+    # Circuit Breaker Configuration
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      recovery_timeout: 60
+      half_open_max_calls: 3
+      
+    # Caching Configuration
+    cache:
+      enabled: true
+      backend: "redis"
+      ttl_seconds: 3600
+      max_size_mb: 1000
+      
+    # Cost Tracking
+    cost_tracking:
+      enabled: true
+      daily_budget_usd: 100.0
+      alert_threshold: 0.8
+      
+    # Monitoring
+    monitoring:
+      metrics_enabled: true
+      tracing_enabled: true
+      log_level: "info"

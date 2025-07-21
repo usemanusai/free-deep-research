@@ -1,0 +1,406 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cost-optimizer
+  namespace: free-deep-research
+  labels:
+    app: cost-optimizer
+    component: optimization
+    phase: "5.0"
+    version: "1.0.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: cost-optimizer
+  template:
+    metadata:
+      labels:
+        app: cost-optimizer
+        component: optimization
+        phase: "5.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9095"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: cost-optimizer
+        image: freeresearch/cost-optimizer:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8085
+          name: http
+          protocol: TCP
+        - containerPort: 9095
+          name: metrics
+          protocol: TCP
+        env:
+        - name: PYTHON_ENV
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: SERVER_PORT
+          value: "8085"
+        - name: METRICS_PORT
+          value: "9095"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-db
+        # Cost Optimization Configuration
+        - name: DAILY_BUDGET_USD
+          value: "100.0"
+        - name: MONTHLY_BUDGET_USD
+          value: "2500.0"
+        - name: ALERT_THRESHOLD
+          value: "0.8"
+        - name: EMERGENCY_THRESHOLD
+          value: "0.95"
+        - name: COST_TRACKING_ENABLED
+          value: "true"
+        - name: BUDGET_ENFORCEMENT_ENABLED
+          value: "true"
+        - name: PREDICTIVE_SCALING_ENABLED
+          value: "true"
+        # ML Model Configuration
+        - name: COST_PREDICTION_MODEL_ENABLED
+          value: "true"
+        - name: USAGE_FORECASTING_ENABLED
+          value: "true"
+        - name: ANOMALY_DETECTION_ENABLED
+          value: "true"
+        # Performance settings
+        - name: OPTIMIZATION_INTERVAL_SECONDS
+          value: "300"
+        - name: COST_CALCULATION_INTERVAL_SECONDS
+          value: "60"
+        - name: BUDGET_CHECK_INTERVAL_SECONDS
+          value: "300"
+        volumeMounts:
+        - name: optimizer-config
+          mountPath: /app/config
+          readOnly: true
+        - name: ml-models
+          mountPath: /app/models
+        - name: temp-storage
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8085
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8085
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8085
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: optimizer-config
+        configMap:
+          name: optimizer-config
+      - name: ml-models
+        persistentVolumeClaim:
+          claimName: optimizer-models-pvc
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - cost-optimizer
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cost-optimizer
+  namespace: free-deep-research
+  labels:
+    app: cost-optimizer
+    component: optimization
+    phase: "5.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9095"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8085
+    targetPort: 8085
+    protocol: TCP
+    name: http
+  - port: 9095
+    targetPort: 9095
+    protocol: TCP
+    name: metrics
+  selector:
+    app: cost-optimizer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: optimizer-models-pvc
+  namespace: free-deep-research
+  labels:
+    app: cost-optimizer
+    component: optimization
+    phase: "5.0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: optimizer-config
+  namespace: free-deep-research
+  labels:
+    app: cost-optimizer
+    component: optimization
+    phase: "5.0"
+data:
+  config.yaml: |
+    # Cost Optimizer Configuration
+    server:
+      host: "0.0.0.0"
+      port: 8085
+      metrics_port: 9095
+      
+    # Budget Configuration
+    budget:
+      daily_limit_usd: 100.0
+      monthly_limit_usd: 2500.0
+      alert_threshold: 0.8
+      emergency_threshold: 0.95
+      enforcement_enabled: true
+      
+    # Cost Tracking
+    cost_tracking:
+      enabled: true
+      granularity: "per_request"
+      aggregation_intervals: ["1m", "5m", "1h", "1d"]
+      retention_days: 90
+      
+    # Optimization Strategies
+    optimization:
+      strategies:
+        - name: "cost_minimization"
+          enabled: true
+          weight: 0.4
+          config:
+            prefer_free_models: true
+            max_cost_per_request: 0.01
+            
+        - name: "performance_cost_balance"
+          enabled: true
+          weight: 0.6
+          config:
+            max_latency_ms: 3000
+            min_quality_score: 0.8
+            
+        - name: "usage_based_scaling"
+          enabled: true
+          config:
+            scale_down_threshold: 0.3
+            scale_up_threshold: 0.8
+            
+    # Predictive Models
+    prediction:
+      cost_forecasting:
+        enabled: true
+        model_type: "time_series"
+        forecast_horizon_hours: 24
+        retrain_interval_hours: 6
+        
+      usage_forecasting:
+        enabled: true
+        model_type: "regression"
+        features: ["hour_of_day", "day_of_week", "historical_usage"]
+        
+      anomaly_detection:
+        enabled: true
+        model_type: "isolation_forest"
+        sensitivity: 0.1
+        
+    # Cost Models
+    cost_models:
+      openai:
+        gpt-4o:
+          input_cost_per_1k: 0.005
+          output_cost_per_1k: 0.015
+        gpt-4o-mini:
+          input_cost_per_1k: 0.00015
+          output_cost_per_1k: 0.0006
+        text-embedding-3-large:
+          cost_per_1k: 0.00013
+          
+      groq:
+        llama-3.1-70b-versatile:
+          input_cost_per_1k: 0.00059
+          output_cost_per_1k: 0.00079
+        llama-3.1-8b-instant:
+          input_cost_per_1k: 0.00005
+          output_cost_per_1k: 0.00008
+          
+      together:
+        llama-3.1-8b-turbo:
+          input_cost_per_1k: 0.00018
+          output_cost_per_1k: 0.00018
+        llama-3.1-70b-turbo:
+          input_cost_per_1k: 0.00088
+          output_cost_per_1k: 0.00088
+          
+      local:
+        ollama:
+          cost_per_1k: 0.0  # Local models are free
+          
+    # Optimization Rules
+    rules:
+      - name: "emergency_cost_control"
+        condition: "daily_spend > daily_budget * 0.95"
+        action: "switch_to_free_models"
+        priority: 1
+        
+      - name: "budget_alert"
+        condition: "daily_spend > daily_budget * 0.8"
+        action: "send_alert"
+        priority: 2
+        
+      - name: "cost_per_request_limit"
+        condition: "estimated_cost > 0.01"
+        action: "suggest_cheaper_model"
+        priority: 3
+        
+      - name: "bulk_discount_optimization"
+        condition: "request_count > 1000"
+        action: "negotiate_bulk_pricing"
+        priority: 4
+        
+    # Monitoring and Alerting
+    monitoring:
+      metrics_enabled: true
+      alerts:
+        - name: "budget_threshold_exceeded"
+          condition: "daily_spend > daily_budget * alert_threshold"
+          channels: ["email", "slack", "webhook"]
+          
+        - name: "cost_anomaly_detected"
+          condition: "cost_anomaly_score > 0.8"
+          channels: ["email", "slack"]
+          
+        - name: "high_cost_request"
+          condition: "request_cost > 0.05"
+          channels: ["webhook"]
+          
+    # Cache Configuration
+    cache:
+      enabled: true
+      ttl_seconds: 300
+      max_size_mb: 100
+      
+  ml-models.yaml: |
+    # Machine Learning models for cost optimization
+    models:
+      cost_forecasting:
+        type: "time_series"
+        algorithm: "prophet"
+        features:
+          - "historical_cost"
+          - "request_volume"
+          - "hour_of_day"
+          - "day_of_week"
+          - "model_usage_distribution"
+        hyperparameters:
+          seasonality_mode: "multiplicative"
+          yearly_seasonality: false
+          weekly_seasonality: true
+          daily_seasonality: true
+          
+      usage_prediction:
+        type: "regression"
+        algorithm: "random_forest"
+        features:
+          - "hour_of_day"
+          - "day_of_week"
+          - "historical_usage"
+          - "user_activity"
+          - "system_load"
+        hyperparameters:
+          n_estimators: 100
+          max_depth: 10
+          min_samples_split: 5
+          
+      anomaly_detection:
+        type: "unsupervised"
+        algorithm: "isolation_forest"
+        features:
+          - "cost_per_request"
+          - "request_frequency"
+          - "model_usage_pattern"
+          - "response_time"
+        hyperparameters:
+          contamination: 0.1
+          n_estimators: 100
+          max_samples: 256

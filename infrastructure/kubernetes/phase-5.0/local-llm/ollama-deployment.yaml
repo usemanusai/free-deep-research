@@ -1,0 +1,333 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: free-deep-research
+  labels:
+    app: ollama
+    component: local-llm
+    phase: "5.0"
+    version: "0.3.12"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+        component: local-llm
+        phase: "5.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "11434"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: ollama
+        image: ollama/ollama:0.3.12
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 11434
+          name: http
+          protocol: TCP
+        env:
+        - name: OLLAMA_HOST
+          value: "0.0.0.0"
+        - name: OLLAMA_PORT
+          value: "11434"
+        - name: OLLAMA_MODELS
+          value: "/app/models"
+        - name: OLLAMA_KEEP_ALIVE
+          value: "5m"
+        - name: OLLAMA_MAX_LOADED_MODELS
+          value: "3"
+        - name: OLLAMA_NUM_PARALLEL
+          value: "4"
+        - name: OLLAMA_MAX_QUEUE
+          value: "512"
+        - name: OLLAMA_DEBUG
+          value: "false"
+        - name: OLLAMA_FLASH_ATTENTION
+          value: "true"
+        # GPU Configuration (if available)
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "all"
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: "compute,utility"
+        volumeMounts:
+        - name: ollama-models
+          mountPath: /app/models
+        - name: ollama-config
+          mountPath: /app/config
+          readOnly: true
+        - name: temp-storage
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 4Gi
+          limits:
+            cpu: 8000m
+            memory: 16Gi
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 40
+      initContainers:
+      - name: model-downloader
+        image: freeresearch/ollama-init:1.0.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: OLLAMA_HOST
+          value: "http://localhost:11434"
+        - name: MODELS_TO_DOWNLOAD
+          value: "llama3.1:8b,mistral:7b,codellama:7b,phi3:mini"
+        volumeMounts:
+        - name: ollama-models
+          mountPath: /app/models
+        - name: ollama-config
+          mountPath: /app/config
+          readOnly: true
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Starting Ollama model download..."
+          
+          # Start Ollama in background
+          ollama serve &
+          OLLAMA_PID=$!
+          
+          # Wait for Ollama to be ready
+          echo "Waiting for Ollama to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost:11434/api/tags >/dev/null 2>&1; then
+              echo "Ollama is ready"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          
+          # Download models
+          IFS=',' read -ra MODELS <<< "$MODELS_TO_DOWNLOAD"
+          for model in "${MODELS[@]}"; do
+            echo "Downloading model: $model"
+            ollama pull "$model" || echo "Failed to download $model"
+          done
+          
+          # Stop Ollama
+          kill $OLLAMA_PID
+          wait $OLLAMA_PID
+          
+          echo "Model download completed"
+      volumes:
+      - name: ollama-models
+        persistentVolumeClaim:
+          claimName: ollama-models-pvc
+      - name: ollama-config
+        configMap:
+          name: ollama-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 2Gi
+      nodeSelector:
+        accelerator: nvidia-tesla-k80
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - ollama
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+  namespace: free-deep-research
+  labels:
+    app: ollama
+    component: local-llm
+    phase: "5.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "11434"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 11434
+    targetPort: 11434
+    protocol: TCP
+    name: http
+  selector:
+    app: ollama
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models-pvc
+  namespace: free-deep-research
+  labels:
+    app: ollama
+    component: local-llm
+    phase: "5.0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-config
+  namespace: free-deep-research
+  labels:
+    app: ollama
+    component: local-llm
+    phase: "5.0"
+data:
+  config.yaml: |
+    # Ollama Configuration
+    server:
+      host: "0.0.0.0"
+      port: 11434
+      
+    # Model Management
+    models:
+      storage_path: "/app/models"
+      keep_alive: "5m"
+      max_loaded_models: 3
+      auto_unload: true
+      
+    # Performance Settings
+    performance:
+      num_parallel: 4
+      max_queue: 512
+      flash_attention: true
+      gpu_memory_fraction: 0.9
+      
+    # Available Models
+    available_models:
+      - name: "llama3.1:8b"
+        size: "4.7GB"
+        context_length: 128000
+        use_case: "general"
+        
+      - name: "mistral:7b"
+        size: "4.1GB"
+        context_length: 32768
+        use_case: "general"
+        
+      - name: "codellama:7b"
+        size: "3.8GB"
+        context_length: 16384
+        use_case: "code"
+        
+      - name: "phi3:mini"
+        size: "2.3GB"
+        context_length: 128000
+        use_case: "lightweight"
+        
+      - name: "gemma2:9b"
+        size: "5.4GB"
+        context_length: 8192
+        use_case: "general"
+        
+    # GPU Configuration
+    gpu:
+      enabled: true
+      memory_fraction: 0.9
+      allow_growth: true
+      
+    # Monitoring
+    monitoring:
+      metrics_enabled: true
+      log_level: "INFO"
+      
+  model-config.yaml: |
+    # Model-specific configurations
+    model_configs:
+      "llama3.1:8b":
+        temperature: 0.7
+        top_p: 0.9
+        top_k: 40
+        repeat_penalty: 1.1
+        context_length: 128000
+        
+      "mistral:7b":
+        temperature: 0.7
+        top_p: 0.9
+        top_k: 40
+        repeat_penalty: 1.1
+        context_length: 32768
+        
+      "codellama:7b":
+        temperature: 0.1
+        top_p: 0.95
+        top_k: 40
+        repeat_penalty: 1.1
+        context_length: 16384
+        
+      "phi3:mini":
+        temperature: 0.7
+        top_p: 0.9
+        top_k: 40
+        repeat_penalty: 1.1
+        context_length: 128000
