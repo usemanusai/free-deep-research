@@ -1,0 +1,338 @@
+# GPU Resources Configuration for Free Deep Research System
+# Phase 4.6: AI/ML Pipeline Enhancement
+
+# NVIDIA Device Plugin DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: nvidia-device-plugin
+    app.kubernetes.io/component: gpu-resources
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds
+    spec:
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      priorityClassName: "system-node-critical"
+      containers:
+      - image: nvcr.io/nvidia/k8s-device-plugin:v0.14.1
+        name: nvidia-device-plugin-ctr
+        args: ["--fail-on-init-error=false"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: device-plugin
+          mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+      - name: device-plugin
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+      nodeSelector:
+        accelerator: nvidia-tesla-k80
+
+---
+# GPU Node Pool Configuration (for cloud providers)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-node-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: gpu-node-config
+    app.kubernetes.io/component: gpu-resources
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  node-config.yaml: |
+    # GPU Node Pool Configuration
+    
+    # Node specifications
+    node_pool:
+      name: "gpu-nodes"
+      machine_type: "n1-standard-4"  # GCP example
+      accelerator:
+        type: "nvidia-tesla-k80"
+        count: 1
+      disk_size: "100GB"
+      disk_type: "pd-ssd"
+      
+    # Auto-scaling configuration
+    autoscaling:
+      enabled: true
+      min_nodes: 0
+      max_nodes: 5
+      target_cpu_utilization: 70
+      scale_down_delay: "10m"
+      scale_up_delay: "30s"
+      
+    # Node labels and taints
+    labels:
+      accelerator: "nvidia-tesla-k80"
+      workload-type: "ml-training"
+      node-type: "gpu"
+      
+    taints:
+    - key: "nvidia.com/gpu"
+      value: "true"
+      effect: "NoSchedule"
+    
+    # Preemptible/Spot instances configuration
+    preemptible: true
+    spot_instance: true
+    
+    # Node initialization script
+    startup_script: |
+      #!/bin/bash
+      # Install NVIDIA drivers
+      curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+      curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+        sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+      
+      sudo apt-get update
+      sudo apt-get install -y nvidia-container-toolkit
+      sudo nvidia-ctk runtime configure --runtime=docker
+      sudo systemctl restart docker
+
+---
+# ResourceQuota for GPU resources
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gpu-resource-quota
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: gpu-resource-quota
+    app.kubernetes.io/component: gpu-resources
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  hard:
+    requests.nvidia.com/gpu: "10"
+    limits.nvidia.com/gpu: "10"
+    requests.cpu: "40"
+    requests.memory: "160Gi"
+    limits.cpu: "80"
+    limits.memory: "320Gi"
+
+---
+# LimitRange for GPU workloads
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: gpu-limit-range
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: gpu-limit-range
+    app.kubernetes.io/component: gpu-resources
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  limits:
+  - type: Container
+    default:
+      nvidia.com/gpu: "1"
+      cpu: "2"
+      memory: "8Gi"
+    defaultRequest:
+      nvidia.com/gpu: "1"
+      cpu: "1"
+      memory: "4Gi"
+    max:
+      nvidia.com/gpu: "4"
+      cpu: "8"
+      memory: "32Gi"
+    min:
+      nvidia.com/gpu: "1"
+      cpu: "500m"
+      memory: "2Gi"
+
+---
+# PriorityClass for GPU workloads
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: gpu-workload-priority
+  labels:
+    app.kubernetes.io/name: gpu-workload-priority
+    app.kubernetes.io/component: gpu-resources
+    app.kubernetes.io/part-of: free-deep-research-system
+value: 1000
+globalDefault: false
+description: "Priority class for GPU-based ML workloads"
+
+---
+# GPU Metrics Exporter
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: gpu-metrics-exporter
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: gpu-metrics-exporter
+    app.kubernetes.io/component: gpu-resources
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      name: gpu-metrics-exporter
+  template:
+    metadata:
+      labels:
+        name: gpu-metrics-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9445"
+        prometheus.io/path: "/metrics"
+    spec:
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: gpu-metrics-exporter
+        image: nvcr.io/nvidia/dcgm-exporter:3.2.5-3.1.8-ubuntu20.04
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9445
+          name: metrics
+          protocol: TCP
+        env:
+        - name: DCGM_EXPORTER_LISTEN
+          value: ":9445"
+        - name: DCGM_EXPORTER_KUBERNETES
+          value: "true"
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+          capabilities:
+            add: ["SYS_ADMIN"]
+        volumeMounts:
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+      nodeSelector:
+        accelerator: nvidia-tesla-k80
+
+---
+# Service for GPU metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: gpu-metrics-service
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: gpu-metrics-exporter
+    app.kubernetes.io/component: gpu-resources
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9445
+    targetPort: 9445
+    protocol: TCP
+    name: metrics
+  selector:
+    name: gpu-metrics-exporter
+
+---
+# ServiceMonitor for GPU metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gpu-metrics
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: gpu-metrics-exporter
+    app.kubernetes.io/component: gpu-resources
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gpu-metrics-exporter
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# HorizontalPodAutoscaler for GPU workloads
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tensorflow-serving-gpu-hpa
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: tensorflow-serving-gpu-hpa
+    app.kubernetes.io/component: gpu-resources
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tensorflow-serving
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: nvidia_gpu_utilization
+      target:
+        type: AverageValue
+        averageValue: "80"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60

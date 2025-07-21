@@ -1,0 +1,384 @@
+# ClickHouse Data Warehouse for Free Deep Research System
+# Phase 4.7: Advanced Analytics & Business Intelligence
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-config
+  namespace: fdr-analytics
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: data-warehouse
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  config.xml: |
+    <?xml version="1.0"?>
+    <clickhouse>
+        <logger>
+            <level>information</level>
+            <console>true</console>
+        </logger>
+        
+        <http_port>8123</http_port>
+        <tcp_port>9000</tcp_port>
+        <mysql_port>9004</mysql_port>
+        <postgresql_port>9005</postgresql_port>
+        
+        <listen_host>::</listen_host>
+        
+        <max_connections>4096</max_connections>
+        <keep_alive_timeout>3</keep_alive_timeout>
+        <max_concurrent_queries>100</max_concurrent_queries>
+        <uncompressed_cache_size>8589934592</uncompressed_cache_size>
+        <mark_cache_size>5368709120</mark_cache_size>
+        
+        <path>/var/lib/clickhouse/</path>
+        <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
+        <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
+        
+        <users_config>users.xml</users_config>
+        
+        <default_profile>default</default_profile>
+        <default_database>default</default_database>
+        
+        <timezone>UTC</timezone>
+        
+        <mlock_executable>false</mlock_executable>
+        
+        <remote_servers>
+            <cluster_1>
+                <shard>
+                    <replica>
+                        <host>clickhouse-service</host>
+                        <port>9000</port>
+                    </replica>
+                </shard>
+            </cluster_1>
+        </remote_servers>
+        
+        <zookeeper incl="zookeeper-servers" optional="true" />
+        
+        <macros incl="macros" optional="true" />
+        
+        <builtin_dictionaries_reload_interval>3600</builtin_dictionaries_reload_interval>
+        
+        <max_session_timeout>3600</max_session_timeout>
+        <default_session_timeout>60</default_session_timeout>
+        
+        <query_log>
+            <database>system</database>
+            <table>query_log</table>
+            <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        </query_log>
+        
+        <dictionaries_config>*_dictionary.xml</dictionaries_config>
+        
+        <compression incl="clickhouse_compression">
+        </compression>
+        
+        <distributed_ddl>
+            <path>/clickhouse/task_queue/ddl</path>
+        </distributed_ddl>
+        
+        <format_schema_path>/var/lib/clickhouse/format_schemas/</format_schema_path>
+    </clickhouse>
+  
+  users.xml: |
+    <?xml version="1.0"?>
+    <clickhouse>
+        <profiles>
+            <default>
+                <max_memory_usage>10000000000</max_memory_usage>
+                <use_uncompressed_cache>0</use_uncompressed_cache>
+                <load_balancing>random</load_balancing>
+            </default>
+            <readonly>
+                <readonly>1</readonly>
+            </readonly>
+        </profiles>
+        
+        <users>
+            <default>
+                <password></password>
+                <networks incl="networks" replace="replace">
+                    <ip>::/0</ip>
+                </networks>
+                <profile>default</profile>
+                <quota>default</quota>
+            </default>
+            
+            <analytics>
+                <password>analytics_password_change_me</password>
+                <networks>
+                    <ip>::/0</ip>
+                </networks>
+                <profile>default</profile>
+                <quota>default</quota>
+            </analytics>
+        </users>
+        
+        <quotas>
+            <default>
+                <interval>
+                    <duration>3600</duration>
+                    <queries>0</queries>
+                    <errors>0</errors>
+                    <result_rows>0</result_rows>
+                    <read_rows>0</read_rows>
+                    <execution_time>0</execution_time>
+                </interval>
+            </default>
+        </quotas>
+    </clickhouse>
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clickhouse
+  namespace: fdr-analytics
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: data-warehouse
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  serviceName: clickhouse-service
+  replicas: 3
+  selector:
+    matchLabels:
+      app: clickhouse
+  template:
+    metadata:
+      labels:
+        app: clickhouse
+        app.kubernetes.io/name: clickhouse
+        app.kubernetes.io/component: data-warehouse
+        app.kubernetes.io/part-of: free-deep-research-system
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9363"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+      containers:
+      - name: clickhouse
+        image: clickhouse/clickhouse-server:23.8
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8123
+          name: http
+          protocol: TCP
+        - containerPort: 9000
+          name: tcp
+          protocol: TCP
+        - containerPort: 9004
+          name: mysql
+          protocol: TCP
+        - containerPort: 9005
+          name: postgresql
+          protocol: TCP
+        - containerPort: 9363
+          name: metrics
+          protocol: TCP
+        env:
+        - name: CLICKHOUSE_DB
+          value: "analytics"
+        - name: CLICKHOUSE_USER
+          value: "analytics"
+        - name: CLICKHOUSE_PASSWORD
+          value: "analytics_password_change_me"
+        volumeMounts:
+        - name: clickhouse-config
+          mountPath: /etc/clickhouse-server/config.xml
+          subPath: config.xml
+          readOnly: true
+        - name: clickhouse-config
+          mountPath: /etc/clickhouse-server/users.xml
+          subPath: users.xml
+          readOnly: true
+        - name: clickhouse-data
+          mountPath: /var/lib/clickhouse
+        resources:
+          requests:
+            cpu: 1
+            memory: 4Gi
+          limits:
+            cpu: 4
+            memory: 16Gi
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 8123
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 8123
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: clickhouse-config
+        configMap:
+          name: clickhouse-config
+  volumeClaimTemplates:
+  - metadata:
+      name: clickhouse-data
+      labels:
+        app.kubernetes.io/name: clickhouse
+        app.kubernetes.io/component: data-warehouse
+        app.kubernetes.io/part-of: free-deep-research-system
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 500Gi
+      storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse-service
+  namespace: fdr-analytics
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: data-warehouse
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8123
+    targetPort: 8123
+    protocol: TCP
+    name: http
+  - port: 9000
+    targetPort: 9000
+    protocol: TCP
+    name: tcp
+  - port: 9004
+    targetPort: 9004
+    protocol: TCP
+    name: mysql
+  - port: 9005
+    targetPort: 9005
+    protocol: TCP
+    name: postgresql
+  - port: 9363
+    targetPort: 9363
+    protocol: TCP
+    name: metrics
+  selector:
+    app: clickhouse
+
+---
+# ClickHouse ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: clickhouse-metrics
+  namespace: fdr-analytics
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: data-warehouse
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# Job to initialize ClickHouse schema
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clickhouse-init
+  namespace: fdr-analytics
+  labels:
+    app.kubernetes.io/name: clickhouse-init
+    app.kubernetes.io/component: data-warehouse
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  template:
+    metadata:
+      labels:
+        app: clickhouse-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: clickhouse-init
+        image: clickhouse/clickhouse-client:23.8
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Wait for ClickHouse to be ready
+          until clickhouse-client --host clickhouse-service --query "SELECT 1"; do
+            echo "Waiting for ClickHouse to be ready..."
+            sleep 5
+          done
+          
+          # Create analytics database and tables
+          clickhouse-client --host clickhouse-service --query "
+          CREATE DATABASE IF NOT EXISTS analytics;
+          
+          CREATE TABLE IF NOT EXISTS analytics.research_sessions (
+            session_id UUID,
+            user_id UUID,
+            start_time DateTime,
+            end_time DateTime,
+            query_text String,
+            results_count UInt32,
+            success_rate Float32,
+            processing_time_ms UInt32,
+            created_at DateTime DEFAULT now()
+          ) ENGINE = MergeTree()
+          ORDER BY (user_id, start_time);
+          
+          CREATE TABLE IF NOT EXISTS analytics.ml_model_metrics (
+            model_name String,
+            model_version String,
+            metric_name String,
+            metric_value Float64,
+            timestamp DateTime,
+            created_at DateTime DEFAULT now()
+          ) ENGINE = MergeTree()
+          ORDER BY (model_name, timestamp);
+          
+          CREATE TABLE IF NOT EXISTS analytics.system_performance (
+            component String,
+            metric_name String,
+            metric_value Float64,
+            timestamp DateTime,
+            labels Map(String, String),
+            created_at DateTime DEFAULT now()
+          ) ENGINE = MergeTree()
+          ORDER BY (component, timestamp);
+          
+          CREATE TABLE IF NOT EXISTS analytics.user_behavior (
+            user_id UUID,
+            action String,
+            page_url String,
+            session_id UUID,
+            timestamp DateTime,
+            metadata Map(String, String),
+            created_at DateTime DEFAULT now()
+          ) ENGINE = MergeTree()
+          ORDER BY (user_id, timestamp);
+          "
+          
+          echo "ClickHouse schema initialization completed"

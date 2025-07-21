@@ -1,0 +1,273 @@
+# MLflow Deployment for Free Deep Research System
+# Phase 4.6: AI/ML Pipeline Enhancement
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlflow-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/component: model-registry
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  mlflow.conf: |
+    # MLflow Server Configuration
+    
+    # Backend store configuration (PostgreSQL)
+    backend_store_uri: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)
+    
+    # Artifact store configuration (S3-compatible)
+    default_artifact_root: s3://mlflow-artifacts/
+    
+    # Server configuration
+    host: 0.0.0.0
+    port: 5000
+    workers: 4
+    
+    # Authentication and authorization
+    auth_config_path: /etc/mlflow/auth.yaml
+    
+    # Experiment tracking
+    enable_system_metrics_logging: true
+    
+    # Model registry
+    model_registry_store_uri: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)
+    
+    # Logging
+    log_level: INFO
+    
+  auth.yaml: |
+    # MLflow Authentication Configuration
+    default_permission: READ
+    database_uri: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)
+    admin_username: admin
+    authorization_function: mlflow.server.auth:authenticate_request_basic_auth
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mlflow-secret
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/component: model-registry
+    app.kubernetes.io/part-of: free-deep-research-system
+type: Opaque
+data:
+  # Base64 encoded credentials (replace with actual values)
+  admin-password: YWRtaW5fcGFzc3dvcmRfY2hhbmdlX21l  # admin_password_change_me
+  s3-access-key: bWxmbG93X2FjY2Vzc19rZXk=  # mlflow_access_key
+  s3-secret-key: bWxmbG93X3NlY3JldF9rZXk=  # mlflow_secret_key
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/component: model-registry
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+        app.kubernetes.io/name: mlflow
+        app.kubernetes.io/component: model-registry
+        app.kubernetes.io/part-of: free-deep-research-system
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: mlflow
+        image: python:3.9-slim
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/bash
+        - -c
+        - |
+          pip install mlflow[extras]==2.8.1 psycopg2-binary boto3 prometheus-client
+          mlflow server \
+            --backend-store-uri postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB) \
+            --default-artifact-root s3://mlflow-artifacts/ \
+            --host 0.0.0.0 \
+            --port 5000 \
+            --workers 4 \
+            --enable-proxy-headers \
+            --gunicorn-opts "--log-level info --access-logfile -"
+        ports:
+        - containerPort: 5000
+          name: http
+          protocol: TCP
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          value: "free_deep_research"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: mlflow-secret
+              key: s3-access-key
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mlflow-secret
+              key: s3-secret-key
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: "http://minio-service:9000"  # Internal MinIO for artifact storage
+        - name: MLFLOW_TRACKING_USERNAME
+          value: "admin"
+        - name: MLFLOW_TRACKING_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mlflow-secret
+              key: admin-password
+        volumeMounts:
+        - name: mlflow-config
+          mountPath: /etc/mlflow
+          readOnly: true
+        - name: mlflow-data
+          mountPath: /mlflow
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: mlflow-config
+        configMap:
+          name: mlflow-config
+      - name: mlflow-data
+        persistentVolumeClaim:
+          claimName: mlflow-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-service
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/component: model-registry
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: mlflow
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-pvc
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/component: model-registry
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+
+---
+# MLflow Istio VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: mlflow-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/component: model-registry
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  hosts:
+  - mlflow.freedeepresearch.org
+  gateways:
+  - ml-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: mlflow-service
+        port:
+          number: 5000
+    timeout: 60s
+    retries:
+      attempts: 3
+      perTryTimeout: 20s
+
+---
+# MLflow ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mlflow-metrics
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/component: model-registry
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mlflow
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
