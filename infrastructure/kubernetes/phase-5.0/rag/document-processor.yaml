@@ -1,0 +1,370 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: document-processor
+  namespace: free-deep-research
+  labels:
+    app: document-processor
+    component: document-processing
+    phase: "5.0"
+    version: "1.0.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: document-processor
+  template:
+    metadata:
+      labels:
+        app: document-processor
+        component: document-processing
+        phase: "5.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9092"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: document-processor
+        image: freeresearch/document-processor:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8082
+          name: http
+          protocol: TCP
+        - containerPort: 9092
+          name: metrics
+          protocol: TCP
+        env:
+        - name: PYTHON_ENV
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: SERVER_PORT
+          value: "8082"
+        - name: METRICS_PORT
+          value: "9092"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: QDRANT_URL
+          value: "http://qdrant-service:6333"
+        - name: EMBEDDING_SERVICE_URL
+          value: "http://embedding-service:8081"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-db
+        # Document Processing Configuration
+        - name: CHUNK_SIZE
+          value: "1000"
+        - name: CHUNK_OVERLAP
+          value: "200"
+        - name: MAX_FILE_SIZE_MB
+          value: "100"
+        - name: SUPPORTED_FORMATS
+          value: "txt,md,pdf,docx,html,json,csv"
+        - name: BATCH_SIZE
+          value: "50"
+        - name: MAX_CONCURRENT_JOBS
+          value: "10"
+        - name: PROCESSING_TIMEOUT_SECONDS
+          value: "300"
+        # OCR Configuration
+        - name: OCR_ENABLED
+          value: "true"
+        - name: OCR_LANGUAGE
+          value: "eng"
+        - name: OCR_DPI
+          value: "300"
+        volumeMounts:
+        - name: document-config
+          mountPath: /app/config
+          readOnly: true
+        - name: temp-storage
+          mountPath: /tmp
+        - name: upload-storage
+          mountPath: /app/uploads
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8082
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: document-config
+        configMap:
+          name: document-processor-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 5Gi
+      - name: upload-storage
+        persistentVolumeClaim:
+          claimName: document-uploads-pvc
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - document-processor
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: document-processor
+  namespace: free-deep-research
+  labels:
+    app: document-processor
+    component: document-processing
+    phase: "5.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9092"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8082
+    targetPort: 8082
+    protocol: TCP
+    name: http
+  - port: 9092
+    targetPort: 9092
+    protocol: TCP
+    name: metrics
+  selector:
+    app: document-processor
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: document-uploads-pvc
+  namespace: free-deep-research
+  labels:
+    app: document-processor
+    component: document-processing
+    phase: "5.0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: document-processor-config
+  namespace: free-deep-research
+  labels:
+    app: document-processor
+    component: document-processing
+    phase: "5.0"
+data:
+  config.yaml: |
+    # Document Processor Configuration
+    server:
+      host: "0.0.0.0"
+      port: 8082
+      metrics_port: 9092
+      workers: 4
+      
+    # Processing Configuration
+    processing:
+      chunk_size: 1000
+      chunk_overlap: 200
+      max_file_size_mb: 100
+      batch_size: 50
+      max_concurrent_jobs: 10
+      timeout_seconds: 300
+      
+    # Supported file formats
+    formats:
+      text: ["txt", "md", "rtf"]
+      pdf: ["pdf"]
+      office: ["docx", "doc", "pptx", "ppt", "xlsx", "xls"]
+      web: ["html", "htm", "xml"]
+      data: ["json", "csv", "tsv"]
+      code: ["py", "js", "ts", "java", "cpp", "c", "go", "rs"]
+      
+    # Text extraction settings
+    extraction:
+      pdf:
+        method: "pymupdf"  # or "pdfplumber", "pypdf2"
+        ocr_enabled: true
+        ocr_language: "eng"
+        ocr_dpi: 300
+        
+      office:
+        method: "python-docx"
+        extract_images: false
+        extract_tables: true
+        
+      html:
+        method: "beautifulsoup"
+        extract_text_only: true
+        remove_scripts: true
+        remove_styles: true
+        
+    # Chunking strategies
+    chunking:
+      strategies:
+        - name: "recursive"
+          chunk_size: 1000
+          chunk_overlap: 200
+          separators: ["\n\n", "\n", " ", ""]
+          
+        - name: "semantic"
+          chunk_size: 1000
+          chunk_overlap: 200
+          use_sentence_boundaries: true
+          
+        - name: "fixed"
+          chunk_size: 1000
+          chunk_overlap: 200
+          
+      default_strategy: "recursive"
+      
+    # Metadata extraction
+    metadata:
+      extract_title: true
+      extract_author: true
+      extract_creation_date: true
+      extract_modification_date: true
+      extract_language: true
+      extract_keywords: true
+      
+    # Quality filters
+    quality:
+      min_chunk_length: 50
+      max_chunk_length: 2000
+      filter_duplicates: true
+      similarity_threshold: 0.95
+      
+    # Storage
+    storage:
+      upload_path: "/app/uploads"
+      temp_path: "/tmp"
+      cleanup_after_processing: true
+      
+    # Integration
+    services:
+      qdrant_url: "http://qdrant-service:6333"
+      embedding_service_url: "http://embedding-service:8081"
+      
+    # Monitoring
+    monitoring:
+      metrics_enabled: true
+      tracing_enabled: true
+      log_level: "INFO"
+      
+  processing-pipeline.yaml: |
+    # Document processing pipeline configuration
+    pipeline:
+      stages:
+        - name: "validation"
+          enabled: true
+          config:
+            max_file_size_mb: 100
+            allowed_formats: ["txt", "md", "pdf", "docx", "html", "json", "csv"]
+            
+        - name: "extraction"
+          enabled: true
+          config:
+            timeout_seconds: 120
+            retry_attempts: 3
+            
+        - name: "preprocessing"
+          enabled: true
+          config:
+            normalize_whitespace: true
+            remove_empty_lines: true
+            fix_encoding: true
+            
+        - name: "chunking"
+          enabled: true
+          config:
+            strategy: "recursive"
+            chunk_size: 1000
+            chunk_overlap: 200
+            
+        - name: "quality_filter"
+          enabled: true
+          config:
+            min_length: 50
+            max_length: 2000
+            filter_duplicates: true
+            
+        - name: "embedding"
+          enabled: true
+          config:
+            batch_size: 50
+            timeout_seconds: 60
+            
+        - name: "indexing"
+          enabled: true
+          config:
+            collection_name: "documents"
+            batch_size: 100
+            
+      error_handling:
+        retry_failed_stages: true
+        max_retries: 3
+        continue_on_error: false

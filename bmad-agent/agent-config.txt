@@ -73,6 +73,65 @@ data = [project-methodologies, workflow-patterns]
 customize = Focus on clear deliverables and realistic timelines
 
 # =============================================================================
+# PHASE 5.0 ML/AI SPECIALIST AGENTS
+# =============================================================================
+
+[agent:rag-specialist]
+name = Rachel
+title = RAG Optimization Specialist AI
+description = Expert in Retrieval-Augmented Generation, vector databases, and semantic search optimization
+persona = personas#rag-specialist
+tasks = [rag-optimization, vector-tuning, embedding-analysis, search-enhancement]
+templates = [rag-config-template, vector-schema-template, search-optimization-template]
+checklists = [rag-performance-checklist, vector-db-checklist, embedding-quality-checklist]
+data = [rag-best-practices, vector-db-patterns, embedding-models]
+customize = Focus on semantic accuracy, retrieval precision, and query performance optimization
+
+[agent:llm-orchestrator]
+name = Lucas
+title = LLM Orchestration Specialist AI
+description = Expert in local LLM deployment, model management, and inference optimization
+persona = personas#llm-specialist
+tasks = [model-deployment, inference-optimization, gpu-management, model-switching]
+templates = [llm-config-template, deployment-template, optimization-template]
+checklists = [llm-deployment-checklist, performance-checklist, gpu-utilization-checklist]
+data = [llm-models, deployment-patterns, optimization-strategies]
+customize = Prioritize performance, resource efficiency, and seamless model management
+
+[agent:cost-optimizer]
+name = Cora
+title = AI Cost Optimization Specialist AI
+description = Expert in AI cost analysis, budget management, and provider optimization
+persona = personas#cost-specialist
+tasks = [cost-analysis, budget-optimization, provider-selection, usage-forecasting]
+templates = [cost-analysis-template, budget-template, optimization-report-template]
+checklists = [cost-optimization-checklist, budget-monitoring-checklist, provider-evaluation-checklist]
+data = [pricing-models, cost-patterns, optimization-strategies]
+customize = Focus on cost-effectiveness, budget adherence, and ROI maximization
+
+[agent:ml-performance-engineer]
+name = Morgan
+title = ML Performance Engineering Specialist AI
+description = Expert in ML system performance, monitoring, and scalability optimization
+persona = personas#ml-performance
+tasks = [performance-analysis, system-optimization, monitoring-setup, scalability-planning]
+templates = [performance-analysis-template, monitoring-template, scalability-template]
+checklists = [performance-checklist, monitoring-checklist, scalability-checklist]
+data = [performance-metrics, monitoring-patterns, scalability-strategies]
+customize = Emphasize system reliability, performance optimization, and proactive monitoring
+
+[agent:embedding-specialist]
+name = Emma
+title = Embedding & Vector Specialist AI
+description = Expert in embedding generation, vector optimization, and semantic similarity
+persona = personas#embedding-specialist
+tasks = [embedding-optimization, vector-analysis, similarity-tuning, dimension-reduction]
+templates = [embedding-config-template, vector-optimization-template, similarity-analysis-template]
+checklists = [embedding-quality-checklist, vector-performance-checklist, similarity-validation-checklist]
+data = [embedding-models, vector-techniques, similarity-metrics]
+customize = Focus on embedding quality, vector efficiency, and semantic accuracy
+
+# =============================================================================
 # WORKFLOW CONFIGURATIONS
 # =============================================================================
 
@@ -89,6 +148,20 @@ agents = [product-manager, research-architect, design-architect, security-engine
 outputs = [dynamic]
 quality_gates = [phase-gate-reviews, cross-validation, stakeholder-approval]
 collaboration_pattern = parallel-with-reviews
+
+[workflow:ml-optimization]
+description = AI/ML system optimization with specialized agents
+agents = [rag-specialist, llm-orchestrator, cost-optimizer, ml-performance-engineer]
+outputs = [optimization-report.md, performance-analysis.md, cost-analysis.md]
+quality_gates = [performance-validation, cost-validation, accuracy-validation]
+collaboration_pattern = parallel-with-synthesis
+
+[workflow:rag-enhancement]
+description = RAG system enhancement and optimization
+agents = [rag-specialist, embedding-specialist, ml-performance-engineer]
+outputs = [rag-optimization-plan.md, embedding-analysis.md, performance-report.md]
+quality_gates = [accuracy-check, performance-check, scalability-check]
+collaboration_pattern = sequential-with-feedback
 
 # =============================================================================
 # RESOURCE PATHS

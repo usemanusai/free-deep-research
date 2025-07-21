@@ -1,0 +1,474 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-schema-phase5
+  namespace: free-deep-research
+  labels:
+    app: graphql-gateway
+    component: api-gateway
+    phase: "5.0"
+data:
+  schema.graphql: |
+    # Phase 5.0 Enhanced GraphQL Schema
+    # Free Deep Research System - Advanced AI/ML Capabilities
+    
+    scalar DateTime
+    scalar JSON
+    scalar Upload
+    
+    # =============================================================================
+    # RAG (Retrieval-Augmented Generation) Types
+    # =============================================================================
+    
+    type RAGQuery {
+      id: ID!
+      query: String!
+      response: String!
+      chunks: [DocumentChunk!]!
+      citations: [Citation!]!
+      confidence: Float!
+      processingTime: Float!
+      model: String!
+      createdAt: DateTime!
+    }
+    
+    type DocumentChunk {
+      id: ID!
+      content: String!
+      metadata: JSON!
+      similarity: Float!
+      source: String!
+      pageNumber: Int
+      chunkIndex: Int!
+    }
+    
+    type Citation {
+      id: ID!
+      source: String!
+      title: String
+      author: String
+      url: String
+      snippet: String!
+      confidence: Float!
+    }
+    
+    type RAGQueryResult {
+      query: RAGQuery!
+      success: Boolean!
+      error: String
+    }
+    
+    input RAGQueryInput {
+      query: String!
+      maxChunks: Int = 10
+      similarityThreshold: Float = 0.7
+      includeMetadata: Boolean = true
+      enableReranking: Boolean = true
+      conversationId: String
+    }
+    
+    # =============================================================================
+    # Vector Database Types
+    # =============================================================================
+    
+    type VectorCollection {
+      name: String!
+      size: Int!
+      vectorDimensions: Int!
+      distance: String!
+      status: String!
+      createdAt: DateTime!
+      updatedAt: DateTime!
+    }
+    
+    type VectorSearchResult {
+      id: String!
+      score: Float!
+      payload: JSON!
+      vector: [Float!]
+    }
+    
+    input VectorSearchInput {
+      collection: String!
+      vector: [Float!]
+      limit: Int = 10
+      filter: JSON
+      withPayload: Boolean = true
+      withVector: Boolean = false
+    }
+    
+    # =============================================================================
+    # Document Processing Types
+    # =============================================================================
+    
+    type DocumentProcessingJob {
+      id: ID!
+      status: ProcessingStatus!
+      fileName: String!
+      fileSize: Int!
+      format: String!
+      chunksGenerated: Int!
+      embeddingsGenerated: Int!
+      processingTime: Float
+      error: String
+      createdAt: DateTime!
+      completedAt: DateTime
+    }
+    
+    enum ProcessingStatus {
+      PENDING
+      PROCESSING
+      COMPLETED
+      FAILED
+    }
+    
+    input DocumentUploadInput {
+      file: Upload!
+      metadata: JSON
+      chunkSize: Int = 1000
+      chunkOverlap: Int = 200
+      extractMetadata: Boolean = true
+    }
+    
+    # =============================================================================
+    # Local LLM Types
+    # =============================================================================
+    
+    type LocalLLMModel {
+      name: String!
+      size: String!
+      status: ModelStatus!
+      contextLength: Int!
+      useCase: String!
+      downloadProgress: Float
+      lastUsed: DateTime
+    }
+    
+    enum ModelStatus {
+      AVAILABLE
+      DOWNLOADING
+      LOADING
+      LOADED
+      ERROR
+    }
+    
+    type LocalLLMResponse {
+      response: String!
+      model: String!
+      tokensGenerated: Int!
+      processingTime: Float!
+      temperature: Float!
+    }
+    
+    input LocalLLMInput {
+      prompt: String!
+      model: String = "llama3.1:8b"
+      temperature: Float = 0.7
+      maxTokens: Int = 1000
+      topP: Float = 0.9
+      topK: Int = 40
+    }
+    
+    # =============================================================================
+    # AI Provider Types
+    # =============================================================================
+    
+    type AIProvider {
+      name: String!
+      status: ProviderStatus!
+      models: [AIModel!]!
+      rateLimits: RateLimits!
+      costs: CostInfo!
+      lastHealthCheck: DateTime!
+    }
+    
+    enum ProviderStatus {
+      ACTIVE
+      INACTIVE
+      ERROR
+      RATE_LIMITED
+    }
+    
+    type AIModel {
+      name: String!
+      type: ModelType!
+      contextLength: Int!
+      costPer1kTokens: Float!
+      averageLatency: Float
+      successRate: Float
+    }
+    
+    enum ModelType {
+      CHAT
+      EMBEDDING
+      COMPLETION
+      CODE
+    }
+    
+    type RateLimits {
+      requestsPerMinute: Int!
+      tokensPerMinute: Int!
+      currentUsage: Int!
+    }
+    
+    type CostInfo {
+      totalSpent: Float!
+      dailySpent: Float!
+      monthlySpent: Float!
+      dailyBudget: Float!
+      monthlyBudget: Float!
+    }
+    
+    # =============================================================================
+    # Model Router Types
+    # =============================================================================
+    
+    type ModelRoutingDecision {
+      selectedModel: String!
+      provider: String!
+      reason: String!
+      estimatedCost: Float!
+      estimatedLatency: Float!
+      complexity: QueryComplexity!
+    }
+    
+    enum QueryComplexity {
+      SIMPLE
+      MEDIUM
+      COMPLEX
+    }
+    
+    type ModelPerformanceMetrics {
+      model: String!
+      provider: String!
+      averageLatency: Float!
+      successRate: Float!
+      costEfficiency: Float!
+      totalRequests: Int!
+      lastUpdated: DateTime!
+    }
+    
+    # =============================================================================
+    # Cost Optimization Types
+    # =============================================================================
+    
+    type CostOptimizationReport {
+      totalSavings: Float!
+      optimizationStrategies: [OptimizationStrategy!]!
+      recommendations: [CostRecommendation!]!
+      budgetStatus: BudgetStatus!
+      generatedAt: DateTime!
+    }
+    
+    type OptimizationStrategy {
+      name: String!
+      description: String!
+      potentialSavings: Float!
+      implemented: Boolean!
+    }
+    
+    type CostRecommendation {
+      type: RecommendationType!
+      description: String!
+      potentialSavings: Float!
+      priority: Priority!
+    }
+    
+    enum RecommendationType {
+      MODEL_SWITCH
+      BATCH_PROCESSING
+      CACHING
+      RATE_LIMITING
+      BUDGET_ADJUSTMENT
+    }
+    
+    enum Priority {
+      LOW
+      MEDIUM
+      HIGH
+      CRITICAL
+    }
+    
+    type BudgetStatus {
+      dailyBudget: Float!
+      dailySpent: Float!
+      dailyRemaining: Float!
+      monthlyBudget: Float!
+      monthlySpent: Float!
+      monthlyRemaining: Float!
+      alertThreshold: Float!
+      emergencyThreshold: Float!
+    }
+    
+    # =============================================================================
+    # MCP (Model Context Protocol) Types
+    # =============================================================================
+    
+    type MCPSession {
+      id: ID!
+      status: SessionStatus!
+      capabilities: [String!]!
+      tools: [MCPTool!]!
+      resources: [MCPResource!]!
+      createdAt: DateTime!
+      lastActivity: DateTime!
+    }
+    
+    enum SessionStatus {
+      ACTIVE
+      INACTIVE
+      EXPIRED
+    }
+    
+    type MCPTool {
+      name: String!
+      description: String!
+      parameters: JSON!
+      enabled: Boolean!
+    }
+    
+    type MCPResource {
+      name: String!
+      description: String!
+      uri: String!
+      mimeType: String
+    }
+    
+    type MCPToolResult {
+      success: Boolean!
+      result: JSON
+      error: String
+      executionTime: Float!
+    }
+    
+    input MCPToolInput {
+      name: String!
+      parameters: JSON!
+      sessionId: String
+    }
+    
+    # =============================================================================
+    # Enhanced BMAD Agent Types
+    # =============================================================================
+    
+    type MLAgent {
+      id: ID!
+      name: String!
+      title: String!
+      description: String!
+      capabilities: [String!]!
+      specializations: [MLSpecialization!]!
+      status: AgentStatus!
+      performance: AgentPerformance!
+    }
+    
+    enum MLSpecialization {
+      RAG_OPTIMIZATION
+      MODEL_SELECTION
+      COST_OPTIMIZATION
+      PERFORMANCE_TUNING
+      DATA_ANALYSIS
+      EMBEDDING_GENERATION
+    }
+    
+    type AgentPerformance {
+      tasksCompleted: Int!
+      successRate: Float!
+      averageResponseTime: Float!
+      userSatisfaction: Float!
+      lastActive: DateTime!
+    }
+    
+    enum AgentStatus {
+      ACTIVE
+      BUSY
+      IDLE
+      OFFLINE
+      ERROR
+    }
+    
+    # =============================================================================
+    # Query Root
+    # =============================================================================
+    
+    type Query {
+      # RAG Queries
+      ragQuery(input: RAGQueryInput!): RAGQueryResult!
+      ragHistory(limit: Int = 10): [RAGQuery!]!
+      
+      # Vector Database
+      vectorCollections: [VectorCollection!]!
+      vectorSearch(input: VectorSearchInput!): [VectorSearchResult!]!
+      
+      # Document Processing
+      processingJobs(status: ProcessingStatus): [DocumentProcessingJob!]!
+      processingJob(id: ID!): DocumentProcessingJob
+      
+      # Local LLM
+      localModels: [LocalLLMModel!]!
+      localModelStatus(name: String!): LocalLLMModel
+      
+      # AI Providers
+      aiProviders: [AIProvider!]!
+      providerStatus(name: String!): AIProvider
+      modelPerformance: [ModelPerformanceMetrics!]!
+      
+      # Model Routing
+      routingDecision(query: String!, context: JSON): ModelRoutingDecision!
+      
+      # Cost Optimization
+      costReport(timeframe: String = "daily"): CostOptimizationReport!
+      budgetStatus: BudgetStatus!
+      
+      # MCP
+      mcpSessions: [MCPSession!]!
+      mcpSession(id: ID!): MCPSession
+      
+      # Enhanced BMAD
+      mlAgents: [MLAgent!]!
+      mlAgent(id: ID!): MLAgent
+    }
+    
+    # =============================================================================
+    # Mutation Root
+    # =============================================================================
+    
+    type Mutation {
+      # Document Processing
+      uploadDocument(input: DocumentUploadInput!): DocumentProcessingJob!
+      
+      # Local LLM
+      generateLocalLLM(input: LocalLLMInput!): LocalLLMResponse!
+      downloadModel(name: String!): LocalLLMModel!
+      unloadModel(name: String!): Boolean!
+      
+      # Vector Database
+      createCollection(name: String!, dimensions: Int!, distance: String = "Cosine"): VectorCollection!
+      deleteCollection(name: String!): Boolean!
+      
+      # Cost Optimization
+      updateBudget(daily: Float, monthly: Float): BudgetStatus!
+      applyOptimization(strategy: String!): Boolean!
+      
+      # MCP
+      createMCPSession: MCPSession!
+      executeMCPTool(input: MCPToolInput!): MCPToolResult!
+      closeMCPSession(id: ID!): Boolean!
+      
+      # Enhanced BMAD
+      activateMLAgent(id: ID!): MLAgent!
+      deactivateMLAgent(id: ID!): MLAgent!
+    }
+    
+    # =============================================================================
+    # Subscription Root
+    # =============================================================================
+    
+    type Subscription {
+      # Real-time updates
+      documentProcessingUpdates: DocumentProcessingJob!
+      modelDownloadProgress(name: String!): LocalLLMModel!
+      costAlerts: CostOptimizationReport!
+      mcpSessionUpdates(sessionId: ID!): MCPSession!
+      agentStatusUpdates: MLAgent!
+    }

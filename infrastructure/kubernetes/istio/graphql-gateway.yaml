@@ -1,0 +1,344 @@
+# Istio GraphQL Gateway Configuration for Free Deep Research System
+# Phase 4.4: API Gateway & GraphQL
+
+# GraphQL Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-graphql-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # HTTPS traffic for GraphQL
+  - port:
+      number: 443
+      name: https-graphql
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: fdr-graphql-tls-certificate
+    hosts:
+    - graphql.freedeepresearch.org
+    - api-v4.freedeepresearch.org
+  
+  # HTTP traffic (redirect to HTTPS)
+  - port:
+      number: 80
+      name: http-graphql
+      protocol: HTTP
+    hosts:
+    - graphql.freedeepresearch.org
+    - api-v4.freedeepresearch.org
+    tls:
+      httpsRedirect: true
+
+---
+# Development GraphQL Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-graphql-dev-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql
+    environment: development
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # HTTPS traffic for development GraphQL
+  - port:
+      number: 443
+      name: https-graphql-dev
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: fdr-graphql-dev-tls-certificate
+    hosts:
+    - graphql-dev.freedeepresearch.org
+    - graphql-staging.freedeepresearch.org
+  
+  # HTTP traffic for development (no redirect for easier testing)
+  - port:
+      number: 80
+      name: http-graphql-dev
+      protocol: HTTP
+    hosts:
+    - graphql-dev.freedeepresearch.org
+    - graphql-staging.freedeepresearch.org
+
+---
+# GraphQL Federation Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: fdr-graphql-federation-gateway
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql-federation
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # Federation HTTPS traffic
+  - port:
+      number: 443
+      name: https-federation
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: fdr-federation-tls-certificate
+    hosts:
+    - federation.freedeepresearch.org
+    - schema-registry.freedeepresearch.org
+
+---
+# GraphQL Gateway Security Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-gateway-security-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql-security
+data:
+  security.yaml: |
+    # GraphQL Gateway security configuration
+    
+    # Rate limiting for GraphQL
+    rate_limiting:
+      graphql_requests_per_minute: 1000
+      graphql_complexity_limit: 1000
+      graphql_depth_limit: 15
+      subscription_limit_per_connection: 100
+      
+    # Query validation
+    query_validation:
+      enable_query_whitelist: false
+      enable_persisted_queries: true
+      max_query_size: 1048576  # 1MB
+      enable_query_complexity_analysis: true
+      enable_query_depth_analysis: true
+      
+    # Authentication
+    authentication:
+      enable_jwt_validation: true
+      jwt_issuer: "https://auth.freedeepresearch.org"
+      jwt_audience: "free-deep-research-api"
+      enable_api_key_auth: true
+      enable_session_auth: true
+      
+    # Authorization
+    authorization:
+      enable_rbac: true
+      enable_field_level_auth: true
+      enable_operation_level_auth: true
+      default_deny: false
+      
+    # CORS configuration
+    cors:
+      allowed_origins:
+        - "https://app.freedeepresearch.org"
+        - "https://dev.freedeepresearch.org"
+        - "https://staging.freedeepresearch.org"
+      allowed_methods:
+        - "GET"
+        - "POST"
+        - "OPTIONS"
+      allowed_headers:
+        - "Content-Type"
+        - "Authorization"
+        - "X-Requested-With"
+        - "X-Apollo-Tracing"
+      expose_headers:
+        - "X-Apollo-Tracing"
+      allow_credentials: true
+      max_age: 86400
+      
+    # Request validation
+    request_validation:
+      max_request_size: 10485760  # 10MB
+      enable_content_type_validation: true
+      allowed_content_types:
+        - "application/json"
+        - "application/graphql"
+        - "multipart/form-data"
+      
+    # Response security
+    response_security:
+      enable_error_masking: true
+      enable_introspection_auth: true
+      enable_playground_auth: false
+      hide_schema_errors: true
+
+---
+# GraphQL Performance Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-performance-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql-performance
+data:
+  performance.yaml: |
+    # GraphQL performance configuration
+    
+    # Connection settings
+    connections:
+      max_connections: 2000
+      connection_timeout: 30s
+      keep_alive_timeout: 75s
+      websocket_timeout: 300s
+      
+    # Query optimization
+    query_optimization:
+      enable_query_caching: true
+      enable_dataloader: true
+      enable_query_batching: true
+      enable_automatic_persisted_queries: true
+      query_cache_ttl: 300
+      dataloader_batch_size: 100
+      
+    # Subscription optimization
+    subscription_optimization:
+      enable_subscription_deduplication: true
+      subscription_keepalive_interval: 30
+      max_subscriptions_per_connection: 100
+      subscription_timeout: 300
+      
+    # Caching strategies
+    caching:
+      enable_response_caching: true
+      enable_field_caching: true
+      enable_query_result_caching: true
+      default_cache_ttl: 300
+      max_cache_size: 1073741824  # 1GB
+      cache_compression: true
+      
+    # Monitoring and tracing
+    monitoring:
+      enable_apollo_tracing: true
+      enable_query_logging: true
+      enable_error_logging: true
+      slow_query_threshold: 1000
+      enable_metrics_collection: true
+      
+    # Federation performance
+    federation:
+      enable_query_planning_cache: true
+      query_plan_cache_ttl: 600
+      enable_schema_composition_cache: true
+      schema_cache_ttl: 3600
+      enable_distributed_caching: true
+
+---
+# GraphQL Monitoring Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphql-monitoring-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: istio-gateway
+    app.kubernetes.io/part-of: free-deep-research-system
+    component: graphql-monitoring
+data:
+  monitoring.yaml: |
+    # GraphQL monitoring configuration
+    
+    # Metrics collection
+    metrics:
+      enable_prometheus_metrics: true
+      enable_custom_metrics: true
+      metrics_port: 9090
+      metrics_path: "/metrics"
+      
+      # GraphQL-specific metrics
+      graphql_metrics:
+        - query_execution_time
+        - query_complexity
+        - query_depth
+        - resolver_execution_time
+        - subscription_count
+        - error_rate
+        - cache_hit_rate
+        - federation_query_plan_time
+        
+    # Distributed tracing
+    tracing:
+      enable_jaeger_tracing: true
+      jaeger_endpoint: "http://jaeger-collector:14268/api/traces"
+      sampling_rate: 0.1
+      enable_apollo_tracing: true
+      
+    # Logging
+    logging:
+      log_level: "info"
+      enable_query_logging: true
+      enable_error_logging: true
+      enable_performance_logging: true
+      log_format: "json"
+      
+      # Log filters
+      log_filters:
+        exclude_introspection: true
+        exclude_health_checks: true
+        log_slow_queries: true
+        slow_query_threshold: 1000
+        
+    # Alerting
+    alerting:
+      enable_alerts: true
+      alert_rules:
+        - name: "high_error_rate"
+          condition: "error_rate > 0.05"
+          duration: "5m"
+          severity: "warning"
+        - name: "slow_queries"
+          condition: "query_execution_time_p95 > 2000"
+          duration: "5m"
+          severity: "warning"
+        - name: "high_complexity_queries"
+          condition: "query_complexity_avg > 800"
+          duration: "5m"
+          severity: "info"
+        - name: "subscription_overload"
+          condition: "subscription_count > 10000"
+          duration: "2m"
+          severity: "critical"
+          
+    # Health checks
+    health_checks:
+      enable_health_endpoint: true
+      health_endpoint_path: "/health"
+      enable_readiness_endpoint: true
+      readiness_endpoint_path: "/ready"
+      
+      # Health check components
+      components:
+        - database_connection
+        - redis_connection
+        - schema_registry_connection
+        - federation_services
+        
+    # Performance monitoring
+    performance:
+      enable_apm: true
+      apm_service_name: "graphql-gateway"
+      enable_profiling: false
+      profiling_endpoint: "/debug/pprof"

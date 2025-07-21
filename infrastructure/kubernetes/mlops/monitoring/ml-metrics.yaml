@@ -1,0 +1,419 @@
+# ML-Specific Monitoring for Free Deep Research System
+# Phase 4.6: AI/ML Pipeline Enhancement
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-monitoring-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: ml-monitoring
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  prometheus-ml-rules.yaml: |
+    groups:
+    - name: ml_model_performance
+      rules:
+      - alert: ModelLatencyHigh
+        expr: histogram_quantile(0.95, rate(tensorflow_serving_request_latency_bucket[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: tensorflow-serving
+        annotations:
+          summary: "High model inference latency detected"
+          description: "95th percentile latency is {{ $value }}s for model {{ $labels.model_name }}"
+      
+      - alert: ModelErrorRateHigh
+        expr: rate(tensorflow_serving_request_count{status!="OK"}[5m]) / rate(tensorflow_serving_request_count[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          component: tensorflow-serving
+        annotations:
+          summary: "High model error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for model {{ $labels.model_name }}"
+      
+      - alert: ModelAccuracyDrop
+        expr: ml_model_accuracy < 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: ml-pipeline
+        annotations:
+          summary: "Model accuracy dropped below threshold"
+          description: "Model {{ $labels.model_name }} accuracy is {{ $value | humanizePercentage }}"
+      
+      - alert: ModelDriftDetected
+        expr: ml_model_drift_score > 0.3
+        for: 10m
+        labels:
+          severity: warning
+          component: ml-pipeline
+        annotations:
+          summary: "Model drift detected"
+          description: "Drift score {{ $value }} detected for model {{ $labels.model_name }}"
+    
+    - name: ml_infrastructure
+      rules:
+      - alert: MLFlowDown
+        expr: up{job="mlflow"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: mlflow
+        annotations:
+          summary: "MLflow server is down"
+          description: "MLflow server has been down for more than 1 minute"
+      
+      - alert: KubeflowPipelineDown
+        expr: up{job="kubeflow-pipelines"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: kubeflow
+        annotations:
+          summary: "Kubeflow Pipelines is down"
+          description: "Kubeflow Pipelines has been down for more than 1 minute"
+      
+      - alert: GPUUtilizationLow
+        expr: nvidia_gpu_utilization < 20
+        for: 15m
+        labels:
+          severity: warning
+          component: gpu
+        annotations:
+          summary: "Low GPU utilization detected"
+          description: "GPU {{ $labels.gpu }} utilization is {{ $value }}% for 15 minutes"
+      
+      - alert: ModelStorageFull
+        expr: (kubelet_volume_stats_used_bytes{persistentvolumeclaim="model-storage-pvc"} / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="model-storage-pvc"}) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "Model storage is almost full"
+          description: "Model storage is {{ $value | humanizePercentage }} full"
+
+  grafana-ml-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "ML Pipeline Overview",
+        "tags": ["ml", "tensorflow", "kubeflow", "mlflow"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Model Inference Latency",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(tensorflow_serving_request_latency_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(tensorflow_serving_request_latency_bucket[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Latency (seconds)",
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": 2,
+            "title": "Model Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(tensorflow_serving_request_count[5m])",
+                "legendFormat": "{{ model_name }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Requests/sec",
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 0
+            }
+          },
+          {
+            "id": 3,
+            "title": "Model Accuracy",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "ml_model_accuracy",
+                "legendFormat": "{{ model_name }}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "min": 0,
+                "max": 1,
+                "thresholds": {
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.8
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.9
+                    }
+                  ]
+                }
+              }
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 6,
+              "x": 0,
+              "y": 8
+            }
+          },
+          {
+            "id": 4,
+            "title": "GPU Utilization",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "nvidia_gpu_utilization",
+                "legendFormat": "GPU {{ gpu }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Utilization (%)",
+                "min": 0,
+                "max": 100
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 6,
+              "x": 6,
+              "y": 8
+            }
+          },
+          {
+            "id": 5,
+            "title": "Training Jobs Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "kubeflow_pipeline_runs_total",
+                "legendFormat": "{{ status }}"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 8
+            }
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-metrics-collector
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: ml-metrics-collector
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-metrics-collector
+  template:
+    metadata:
+      labels:
+        app: ml-metrics-collector
+        app.kubernetes.io/name: ml-metrics-collector
+        app.kubernetes.io/component: monitoring
+        app.kubernetes.io/part-of: free-deep-research-system
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: ml-metrics-collector
+        image: freeresearch/ml-metrics-collector:4.6.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: RUST_ENV
+          value: "production"
+        - name: RUST_LOG
+          value: "info,ml_metrics_collector=debug"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: MLFLOW_TRACKING_URI
+          value: "http://mlflow-service:5000"
+        - name: TENSORFLOW_SERVING_URL
+          value: "http://tensorflow-serving-service:8501"
+        - name: PROMETHEUS_URL
+          value: "http://prometheus-service:9090"
+        - name: COLLECTION_INTERVAL
+          value: "30s"
+        volumeMounts:
+        - name: ml-monitoring-config
+          mountPath: /etc/ml-monitoring
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: ml-monitoring-config
+        configMap:
+          name: ml-monitoring-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-metrics-collector-service
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: ml-metrics-collector
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: ml-metrics-collector
+
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ml-metrics-collector
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: ml-metrics-collector
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ml-metrics-collector
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# PrometheusRule for ML alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ml-monitoring-rules
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: ml-monitoring
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  groups:
+  - name: ml_model_performance
+    rules:
+    - alert: ModelLatencyHigh
+      expr: histogram_quantile(0.95, rate(tensorflow_serving_request_latency_bucket[5m])) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+        component: tensorflow-serving
+      annotations:
+        summary: "High model inference latency detected"
+        description: "95th percentile latency is {{ $value }}s for model {{ $labels.model_name }}"
+    
+    - alert: ModelErrorRateHigh
+      expr: rate(tensorflow_serving_request_count{status!="OK"}[5m]) / rate(tensorflow_serving_request_count[5m]) > 0.05
+      for: 1m
+      labels:
+        severity: critical
+        component: tensorflow-serving
+      annotations:
+        summary: "High model error rate detected"
+        description: "Error rate is {{ $value | humanizePercentage }} for model {{ $labels.model_name }}"

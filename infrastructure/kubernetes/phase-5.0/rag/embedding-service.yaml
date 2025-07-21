@@ -1,0 +1,302 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding-service
+  namespace: free-deep-research
+  labels:
+    app: embedding-service
+    component: embedding-generator
+    phase: "5.0"
+    version: "1.0.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: embedding-service
+  template:
+    metadata:
+      labels:
+        app: embedding-service
+        component: embedding-generator
+        phase: "5.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: embedding-service
+        image: freeresearch/embedding-service:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8081
+          name: http
+          protocol: TCP
+        - containerPort: 9091
+          name: metrics
+          protocol: TCP
+        env:
+        - name: PYTHON_ENV
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: SERVER_PORT
+          value: "8081"
+        - name: METRICS_PORT
+          value: "9091"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: openai-api-key
+              optional: true
+        - name: HUGGINGFACE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-provider-secrets
+              key: huggingface-api-key
+              optional: true
+        # Embedding Configuration
+        - name: DEFAULT_MODEL
+          value: "text-embedding-3-large"
+        - name: FALLBACK_MODEL
+          value: "all-mpnet-base-v2"
+        - name: BATCH_SIZE
+          value: "100"
+        - name: MAX_TOKENS
+          value: "8192"
+        - name: CACHE_ENABLED
+          value: "true"
+        - name: CACHE_TTL_SECONDS
+          value: "86400"
+        - name: LOCAL_MODELS_ENABLED
+          value: "true"
+        - name: GPU_ENABLED
+          value: "false"
+        # Performance settings
+        - name: MAX_CONCURRENT_REQUESTS
+          value: "50"
+        - name: REQUEST_TIMEOUT_SECONDS
+          value: "60"
+        - name: WORKER_THREADS
+          value: "4"
+        volumeMounts:
+        - name: embedding-config
+          mountPath: /app/config
+          readOnly: true
+        - name: model-cache
+          mountPath: /app/models
+        - name: temp-storage
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 60
+      volumes:
+      - name: embedding-config
+        configMap:
+          name: embedding-config
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: embedding-models-pvc
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 2Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - embedding-service
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: embedding-service
+  namespace: free-deep-research
+  labels:
+    app: embedding-service
+    component: embedding-generator
+    phase: "5.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9091"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+    name: http
+  - port: 9091
+    targetPort: 9091
+    protocol: TCP
+    name: metrics
+  selector:
+    app: embedding-service
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: embedding-models-pvc
+  namespace: free-deep-research
+  labels:
+    app: embedding-service
+    component: embedding-generator
+    phase: "5.0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: embedding-config
+  namespace: free-deep-research
+  labels:
+    app: embedding-service
+    component: embedding-generator
+    phase: "5.0"
+data:
+  config.yaml: |
+    # Embedding Service Configuration
+    server:
+      host: "0.0.0.0"
+      port: 8081
+      metrics_port: 9091
+      workers: 4
+      
+    # Model Configuration
+    models:
+      primary:
+        name: "text-embedding-3-large"
+        provider: "openai"
+        dimensions: 1536
+        max_tokens: 8192
+        batch_size: 100
+        
+      fallback:
+        name: "all-mpnet-base-v2"
+        provider: "sentence_transformers"
+        dimensions: 768
+        max_tokens: 512
+        batch_size: 32
+        
+      local_models:
+        - name: "all-mpnet-base-v2"
+          path: "/app/models/all-mpnet-base-v2"
+          dimensions: 768
+          max_tokens: 512
+          
+        - name: "all-MiniLM-L6-v2"
+          path: "/app/models/all-MiniLM-L6-v2"
+          dimensions: 384
+          max_tokens: 512
+          
+    # Provider Configuration
+    providers:
+      openai:
+        api_key_env: "OPENAI_API_KEY"
+        base_url: "https://api.openai.com/v1"
+        timeout: 60
+        max_retries: 3
+        
+      huggingface:
+        api_key_env: "HUGGINGFACE_API_KEY"
+        base_url: "https://api-inference.huggingface.co"
+        timeout: 60
+        max_retries: 3
+        
+      sentence_transformers:
+        device: "cpu"
+        normalize_embeddings: true
+        
+    # Caching
+    cache:
+      enabled: true
+      backend: "redis"
+      ttl_seconds: 86400
+      max_size_mb: 1000
+      
+    # Performance
+    performance:
+      max_concurrent_requests: 50
+      request_timeout_seconds: 60
+      batch_processing_enabled: true
+      auto_scaling_enabled: true
+      
+    # Monitoring
+    monitoring:
+      metrics_enabled: true
+      tracing_enabled: true
+      log_level: "INFO"
+      
+  model-download.yaml: |
+    # Model download configuration
+    download:
+      enabled: true
+      models:
+        - name: "all-mpnet-base-v2"
+          source: "sentence-transformers/all-mpnet-base-v2"
+          destination: "/app/models/all-mpnet-base-v2"
+          
+        - name: "all-MiniLM-L6-v2"
+          source: "sentence-transformers/all-MiniLM-L6-v2"
+          destination: "/app/models/all-MiniLM-L6-v2"
+          
+        - name: "bge-large-en-v1.5"
+          source: "BAAI/bge-large-en-v1.5"
+          destination: "/app/models/bge-large-en-v1.5"

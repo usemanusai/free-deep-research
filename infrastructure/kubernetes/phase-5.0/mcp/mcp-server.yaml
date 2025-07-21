@@ -1,0 +1,444 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+  namespace: free-deep-research
+  labels:
+    app: mcp-server
+    component: mcp-protocol
+    phase: "5.0"
+    version: "1.0.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: mcp-server
+  template:
+    metadata:
+      labels:
+        app: mcp-server
+        component: mcp-protocol
+        phase: "5.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9096"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: mcp-server
+        image: freeresearch/mcp-server:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8086
+          name: http
+          protocol: TCP
+        - containerPort: 8087
+          name: websocket
+          protocol: TCP
+        - containerPort: 9096
+          name: metrics
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: HTTP_PORT
+          value: "8086"
+        - name: WEBSOCKET_PORT
+          value: "8087"
+        - name: METRICS_PORT
+          value: "9096"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-db
+        # MCP Configuration
+        - name: MCP_VERSION
+          value: "0.1.0"
+        - name: MCP_SERVER_NAME
+          value: "free-deep-research-mcp"
+        - name: MCP_SERVER_VERSION
+          value: "1.0.0"
+        - name: SESSION_TIMEOUT_SECONDS
+          value: "3600"
+        - name: MAX_CONCURRENT_SESSIONS
+          value: "1000"
+        - name: TOOL_EXECUTION_TIMEOUT_SECONDS
+          value: "300"
+        # Service Integration
+        - name: RAG_SERVICE_URL
+          value: "http://rag-service:8080"
+        - name: PROVIDER_GATEWAY_URL
+          value: "http://provider-gateway:8083"
+        - name: MODEL_ROUTER_URL
+          value: "http://model-router:8084"
+        - name: EMBEDDING_SERVICE_URL
+          value: "http://embedding-service:8081"
+        - name: DOCUMENT_PROCESSOR_URL
+          value: "http://document-processor:8082"
+        volumeMounts:
+        - name: mcp-config
+          mountPath: /app/config
+          readOnly: true
+        - name: temp-storage
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8086
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8086
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8086
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: mcp-config
+        configMap:
+          name: mcp-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - mcp-server
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server
+  namespace: free-deep-research
+  labels:
+    app: mcp-server
+    component: mcp-protocol
+    phase: "5.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9096"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8086
+    targetPort: 8086
+    protocol: TCP
+    name: http
+  - port: 8087
+    targetPort: 8087
+    protocol: TCP
+    name: websocket
+  - port: 9096
+    targetPort: 9096
+    protocol: TCP
+    name: metrics
+  selector:
+    app: mcp-server
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-config
+  namespace: free-deep-research
+  labels:
+    app: mcp-server
+    component: mcp-protocol
+    phase: "5.0"
+data:
+  config.yaml: |
+    # MCP Server Configuration
+    server:
+      name: "free-deep-research-mcp"
+      version: "1.0.0"
+      description: "Model Context Protocol server for Free Deep Research System"
+      http_port: 8086
+      websocket_port: 8087
+      metrics_port: 9096
+      
+    # MCP Protocol Configuration
+    mcp:
+      version: "0.1.0"
+      capabilities:
+        - "tools"
+        - "resources"
+        - "prompts"
+        - "logging"
+        - "sampling"
+        
+    # Session Management
+    sessions:
+      timeout_seconds: 3600
+      max_concurrent: 1000
+      cleanup_interval_seconds: 300
+      
+    # Tool Configuration
+    tools:
+      execution_timeout_seconds: 300
+      max_concurrent_executions: 50
+      
+      available_tools:
+        - name: "rag_query"
+          description: "Perform RAG-based query with context retrieval"
+          parameters:
+            query:
+              type: "string"
+              description: "The query to search for"
+              required: true
+            max_chunks:
+              type: "number"
+              description: "Maximum number of chunks to retrieve"
+              default: 10
+            similarity_threshold:
+              type: "number"
+              description: "Minimum similarity threshold"
+              default: 0.7
+              
+        - name: "generate_embedding"
+          description: "Generate embeddings for text"
+          parameters:
+            text:
+              type: "string"
+              description: "Text to embed"
+              required: true
+            model:
+              type: "string"
+              description: "Embedding model to use"
+              default: "text-embedding-3-large"
+              
+        - name: "process_document"
+          description: "Process and index a document"
+          parameters:
+            content:
+              type: "string"
+              description: "Document content"
+              required: true
+            format:
+              type: "string"
+              description: "Document format"
+              default: "text"
+            metadata:
+              type: "object"
+              description: "Document metadata"
+              
+        - name: "chat_completion"
+          description: "Generate chat completion using optimal model routing"
+          parameters:
+            messages:
+              type: "array"
+              description: "Chat messages"
+              required: true
+            model:
+              type: "string"
+              description: "Preferred model (optional, router will optimize)"
+            temperature:
+              type: "number"
+              description: "Sampling temperature"
+              default: 0.7
+            max_tokens:
+              type: "number"
+              description: "Maximum tokens to generate"
+              default: 1000
+              
+        - name: "search_vector_db"
+          description: "Search vector database directly"
+          parameters:
+            query_vector:
+              type: "array"
+              description: "Query vector"
+              required: true
+            collection:
+              type: "string"
+              description: "Collection name"
+              default: "documents"
+            limit:
+              type: "number"
+              description: "Number of results"
+              default: 10
+              
+    # Resource Configuration
+    resources:
+      - name: "documents"
+        description: "Access to document collection"
+        uri_template: "documents://{id}"
+        
+      - name: "embeddings"
+        description: "Access to embedding vectors"
+        uri_template: "embeddings://{id}"
+        
+      - name: "conversations"
+        description: "Access to conversation history"
+        uri_template: "conversations://{session_id}"
+        
+    # Prompt Templates
+    prompts:
+      - name: "rag_system_prompt"
+        description: "System prompt for RAG queries"
+        template: |
+          You are an AI assistant with access to a knowledge base. Use the provided context to answer questions accurately and cite your sources.
+          
+          Context: {context}
+          
+          Question: {question}
+          
+          Please provide a comprehensive answer based on the context provided. If the context doesn't contain enough information, say so clearly.
+          
+      - name: "research_analysis_prompt"
+        description: "Prompt for research analysis tasks"
+        template: |
+          Analyze the following research data and provide insights:
+          
+          Data: {data}
+          
+          Please provide:
+          1. Key findings
+          2. Trends and patterns
+          3. Recommendations
+          4. Areas for further investigation
+          
+    # Logging Configuration
+    logging:
+      enabled: true
+      level: "info"
+      include_request_body: false
+      include_response_body: false
+      
+    # Sampling Configuration
+    sampling:
+      enabled: true
+      default_temperature: 0.7
+      default_top_p: 0.9
+      default_max_tokens: 1000
+      
+    # Integration Configuration
+    integrations:
+      rag_service:
+        url: "http://rag-service:8080"
+        timeout: 30
+        
+      provider_gateway:
+        url: "http://provider-gateway:8083"
+        timeout: 120
+        
+      model_router:
+        url: "http://model-router:8084"
+        timeout: 5
+        
+      embedding_service:
+        url: "http://embedding-service:8081"
+        timeout: 60
+        
+      document_processor:
+        url: "http://document-processor:8082"
+        timeout: 300
+        
+    # Security Configuration
+    security:
+      cors_enabled: true
+      cors_origins: ["*"]
+      rate_limiting:
+        enabled: true
+        requests_per_minute: 1000
+        burst_size: 100
+        
+    # Monitoring
+    monitoring:
+      metrics_enabled: true
+      tracing_enabled: true
+      health_check_interval: 30
+      
+  mcp-schema.json: |
+    {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Free Deep Research MCP Schema",
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "type": "string",
+          "const": "2.0"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "initialize",
+            "tools/list",
+            "tools/call",
+            "resources/list",
+            "resources/read",
+            "prompts/list",
+            "prompts/get",
+            "logging/setLevel",
+            "sampling/createMessage"
+          ]
+        },
+        "params": {
+          "type": "object"
+        },
+        "id": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "number"},
+            {"type": "null"}
+          ]
+        }
+      },
+      "required": ["jsonrpc", "method"],
+      "additionalProperties": false
+    }

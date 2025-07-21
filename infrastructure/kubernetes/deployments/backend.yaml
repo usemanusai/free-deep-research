@@ -1,0 +1,316 @@
+# Backend Rust Service Deployment for Free Deep Research System
+# Phase 4.3: Infrastructure Modernization
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: free-deep-research-system
+type: Opaque
+data:
+  # Base64 encoded values - replace with actual values
+  jwt-secret: and0X3NlY3JldF9rZXlfY2hhbmdlX21l  # jwt_secret_key_change_me
+  api-key: YXBpX2tleV9jaGFuZ2VfbWU=  # api_key_change_me
+  encryption-key: ZW5jcnlwdGlvbl9rZXlfY2hhbmdlX21l  # encryption_key_change_me
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  config.yaml: |
+    # Backend Configuration for Free Deep Research System
+    
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      workers: 4
+      max_connections: 1000
+      keep_alive: 75
+      timeout: 30
+    
+    database:
+      max_connections: 20
+      min_connections: 5
+      connection_timeout: 30
+      idle_timeout: 600
+      max_lifetime: 1800
+    
+    redis:
+      max_connections: 10
+      connection_timeout: 5
+      command_timeout: 10
+      pool_size: 20
+    
+    event_store:
+      batch_size: 100
+      flush_interval: 1000
+      max_retries: 3
+      retry_delay: 1000
+    
+    cqrs:
+      command_timeout: 30
+      query_timeout: 10
+      projection_batch_size: 50
+      enable_caching: true
+      cache_ttl: 300
+    
+    ai_orchestration:
+      max_concurrent_workflows: 100
+      workflow_timeout: 1800
+      agent_pool_size: 10
+      enable_distributed_processing: true
+    
+    security:
+      enable_cors: true
+      cors_origins: ["https://app.freedeepresearch.org"]
+      rate_limit_requests: 1000
+      rate_limit_window: 3600
+      enable_request_logging: true
+    
+    monitoring:
+      enable_metrics: true
+      metrics_port: 9090
+      enable_tracing: true
+      tracing_endpoint: "http://jaeger-collector:14268/api/traces"
+      log_level: "info"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: free-deep-research-system
+    app.kubernetes.io/version: "3.1.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/component: api
+        app.kubernetes.io/part-of: free-deep-research-system
+        app.kubernetes.io/version: "3.1.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: fdr-service-account
+      priorityClassName: fdr-high
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: backend
+        image: freeresearch/backend:3.1.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_ENV
+          value: "production"
+        - name: RUST_LOG
+          value: "info,free_deep_research=debug"
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-db
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@redis-service:6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: redis-password
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: jwt-secret
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: api-key
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: encryption-key
+        - name: CONFIG_PATH
+          value: "/app/config/config.yaml"
+        volumeMounts:
+        - name: backend-config
+          mountPath: /app/config
+        - name: temp-storage
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+      
+      volumes:
+      - name: backend-config
+        configMap:
+          name: backend-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      
+      # Node affinity for API workloads
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - api
+          - weight: 50
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+        
+        # Anti-affinity to spread replicas across nodes
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - backend
+              topologyKey: kubernetes.io/hostname
+      
+      # Toleration for dedicated API nodes
+      tolerations:
+      - key: "api"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+
+---
+# Backend Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-metrics
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+      app.kubernetes.io/component: api
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

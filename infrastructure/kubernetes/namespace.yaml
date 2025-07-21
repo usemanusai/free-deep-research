@@ -1,0 +1,280 @@
+# Kubernetes Namespace for Free Deep Research System
+# Phase 4.3: Infrastructure Modernization
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: free-deep-research
+  labels:
+    name: free-deep-research
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/version: "3.1.0"
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: free-deep-research-system
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    description: "Free Deep Research System - AI-Powered Research Platform"
+    contact: "team@freedeepresearch.org"
+    documentation: "https://freedeepresearch.org/docs"
+    
+---
+# Resource Quotas for the namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: fdr-resource-quota
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: resource-quota
+spec:
+  hard:
+    # Compute resources
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    
+    # Storage resources
+    requests.storage: 100Gi
+    persistentvolumeclaims: "10"
+    
+    # Object counts
+    pods: "50"
+    services: "20"
+    secrets: "20"
+    configmaps: "20"
+    ingresses.networking.k8s.io: "5"
+    
+    # Load balancers
+    services.loadbalancers: "3"
+
+---
+# Network Policies for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fdr-network-policy
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  # Ingress rules
+  ingress:
+  - from:
+    # Allow traffic from same namespace
+    - namespaceSelector:
+        matchLabels:
+          name: free-deep-research
+    # Allow traffic from ingress controllers
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    # Allow traffic from monitoring namespace
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080  # Backend API
+    - protocol: TCP
+      port: 3000  # Frontend
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+  
+  # Egress rules
+  egress:
+  - to: []  # Allow all outbound traffic for external API calls
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to:
+    # Allow traffic within namespace
+    - namespaceSelector:
+        matchLabels:
+          name: free-deep-research
+  - to:
+    # Allow traffic to system namespaces
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+
+---
+# Limit Ranges for resource management
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: fdr-limit-range
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: limit-range
+spec:
+  limits:
+  # Container limits
+  - type: Container
+    default:
+      cpu: "1"
+      memory: 1Gi
+    defaultRequest:
+      cpu: "100m"
+      memory: 128Mi
+    max:
+      cpu: "4"
+      memory: 8Gi
+    min:
+      cpu: "50m"
+      memory: 64Mi
+  
+  # Pod limits
+  - type: Pod
+    max:
+      cpu: "8"
+      memory: 16Gi
+    min:
+      cpu: "100m"
+      memory: 128Mi
+  
+  # PVC limits
+  - type: PersistentVolumeClaim
+    max:
+      storage: 50Gi
+    min:
+      storage: 1Gi
+
+---
+# Priority Classes for workload prioritization
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: fdr-critical
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: priority-class
+value: 1000
+globalDefault: false
+description: "Critical Free Deep Research System components"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: fdr-high
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: priority-class
+value: 500
+globalDefault: false
+description: "High priority Free Deep Research System components"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: fdr-normal
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: priority-class
+value: 100
+globalDefault: true
+description: "Normal priority Free Deep Research System components"
+
+---
+# Service Account for the application
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fdr-service-account
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: service-account
+  annotations:
+    description: "Service account for Free Deep Research System"
+automountServiceAccountToken: true
+
+---
+# Cluster Role for the application
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fdr-cluster-role
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: cluster-role
+rules:
+# Read access to nodes for monitoring
+- apiGroups: [""]
+  resources: ["nodes", "nodes/metrics"]
+  verbs: ["get", "list", "watch"]
+
+# Read access to pods for health checks
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+
+# Access to services for service discovery
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Cluster Role Binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fdr-cluster-role-binding
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: cluster-role-binding
+subjects:
+- kind: ServiceAccount
+  name: fdr-service-account
+  namespace: free-deep-research
+roleRef:
+  kind: ClusterRole
+  name: fdr-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Pod Security Policy (if PSP is enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: fdr-pod-security-policy
+  labels:
+    app.kubernetes.io/name: free-deep-research
+    app.kubernetes.io/component: pod-security-policy
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'

@@ -1,0 +1,359 @@
+# A/B Testing Framework for Free Deep Research System
+# Phase 4.6: AI/ML Pipeline Enhancement
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ab-test-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: ab-test-controller
+    app.kubernetes.io/component: ab-testing
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  config.yaml: |
+    # A/B Testing Configuration
+    
+    # Controller settings
+    controller:
+      reconcile_interval: 30s
+      metrics_collection_interval: 10s
+      experiment_timeout: 24h
+      min_sample_size: 1000
+      significance_level: 0.05
+      
+    # Traffic splitting
+    traffic:
+      default_split: 50/50
+      ramp_up_duration: 1h
+      ramp_down_duration: 30m
+      max_traffic_shift: 10  # percent per interval
+      
+    # Model comparison
+    models:
+      comparison_metrics:
+        - accuracy
+        - latency
+        - throughput
+        - error_rate
+      performance_threshold: 0.95
+      latency_threshold: 100ms
+      
+    # Experiment tracking
+    tracking:
+      database_url: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)
+      metrics_retention: 30d
+      experiment_retention: 90d
+      
+    # Alerting
+    alerts:
+      enable_slack: true
+      enable_email: true
+      performance_degradation_threshold: 0.1
+      error_rate_threshold: 0.05
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ab-test-controller
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: ab-test-controller
+    app.kubernetes.io/component: ab-testing
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ab-test-controller
+  template:
+    metadata:
+      labels:
+        app: ab-test-controller
+        app.kubernetes.io/name: ab-test-controller
+        app.kubernetes.io/component: ab-testing
+        app.kubernetes.io/part-of: free-deep-research-system
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: ab-test-controller
+        image: freeresearch/ab-test-controller:4.6.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_ENV
+          value: "production"
+        - name: RUST_LOG
+          value: "info,ab_test_controller=debug"
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: ISTIO_NAMESPACE
+          value: "istio-system"
+        - name: PROMETHEUS_URL
+          value: "http://prometheus-service:9090"
+        volumeMounts:
+        - name: ab-test-config
+          mountPath: /etc/ab-test
+          readOnly: true
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: ab-test-config
+        configMap:
+          name: ab-test-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ab-test-controller-service
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: ab-test-controller
+    app.kubernetes.io/component: ab-testing
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: ab-test-controller
+
+---
+# Custom Resource Definition for A/B Tests
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: abtests.ml.freedeepresearch.org
+  labels:
+    app.kubernetes.io/name: ab-test-controller
+    app.kubernetes.io/component: ab-testing
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  group: ml.freedeepresearch.org
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              name:
+                type: string
+                description: "Name of the A/B test experiment"
+              description:
+                type: string
+                description: "Description of the experiment"
+              models:
+                type: object
+                properties:
+                  control:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      version:
+                        type: string
+                      weight:
+                        type: integer
+                        minimum: 0
+                        maximum: 100
+                  treatment:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      version:
+                        type: string
+                      weight:
+                        type: integer
+                        minimum: 0
+                        maximum: 100
+              duration:
+                type: string
+                description: "Duration of the experiment (e.g., '24h', '7d')"
+              metrics:
+                type: array
+                items:
+                  type: string
+                description: "Metrics to track during the experiment"
+              success_criteria:
+                type: object
+                properties:
+                  metric:
+                    type: string
+                  threshold:
+                    type: number
+                  comparison:
+                    type: string
+                    enum: ["greater_than", "less_than", "equal_to"]
+              traffic_allocation:
+                type: object
+                properties:
+                  percentage:
+                    type: integer
+                    minimum: 1
+                    maximum: 100
+                  user_segments:
+                    type: array
+                    items:
+                      type: string
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                enum: ["pending", "running", "completed", "failed"]
+              start_time:
+                type: string
+                format: date-time
+              end_time:
+                type: string
+                format: date-time
+              results:
+                type: object
+                properties:
+                  control_metrics:
+                    type: object
+                  treatment_metrics:
+                    type: object
+                  statistical_significance:
+                    type: boolean
+                  confidence_level:
+                    type: number
+                  winner:
+                    type: string
+                    enum: ["control", "treatment", "inconclusive"]
+            required:
+            - phase
+  scope: Namespaced
+  names:
+    plural: abtests
+    singular: abtest
+    kind: ABTest
+    shortNames:
+    - abt
+
+---
+# RBAC for A/B Test Controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ab-test-controller
+  labels:
+    app.kubernetes.io/name: ab-test-controller
+    app.kubernetes.io/component: ab-testing
+    app.kubernetes.io/part-of: free-deep-research-system
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["networking.istio.io"]
+  resources: ["virtualservices", "destinationrules"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["ml.freedeepresearch.org"]
+  resources: ["abtests"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ab-test-controller
+  labels:
+    app.kubernetes.io/name: ab-test-controller
+    app.kubernetes.io/component: ab-testing
+    app.kubernetes.io/part-of: free-deep-research-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ab-test-controller
+subjects:
+- kind: ServiceAccount
+  name: fdr-service-account
+  namespace: free-deep-research
+
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ab-test-controller-metrics
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: ab-test-controller
+    app.kubernetes.io/component: ab-testing
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ab-test-controller
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

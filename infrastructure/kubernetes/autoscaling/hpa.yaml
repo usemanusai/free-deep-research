@@ -1,0 +1,371 @@
+# Horizontal Pod Autoscaler Configuration for Free Deep Research System
+# Phase 4.3: Infrastructure Modernization
+
+# Backend API HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  # CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metrics - requests per second
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  # Custom metrics - response time
+  - type: Pods
+    pods:
+      metric:
+        name: http_request_duration_seconds
+      target:
+        type: AverageValue
+        averageValue: "200m"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 4
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# Frontend HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: frontend-hpa
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: web
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frontend
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+  # CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  # Memory utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Custom metrics - nginx connections
+  - type: Pods
+    pods:
+      metric:
+        name: nginx_connections_active
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 3
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+# Redis HPA (for read replicas)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: redis-hpa
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: redis
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  # CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  # Memory utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  # Custom metrics - Redis connections
+  - type: Pods
+    pods:
+      metric:
+        name: redis_connected_clients
+      target:
+        type: AverageValue
+        averageValue: "50"
+  # Custom metrics - Redis operations per second
+  - type: Pods
+    pods:
+      metric:
+        name: redis_instantaneous_ops_per_sec
+      target:
+        type: AverageValue
+        averageValue: "1000"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # Longer stabilization for stateful sets
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# PostgreSQL HPA (for read replicas)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: postgresql-read-replica-hpa
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: database-replica
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: postgresql-read-replica
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  # CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metrics - database connections
+  - type: Pods
+    pods:
+      metric:
+        name: postgresql_connections_active
+      target:
+        type: AverageValue
+        averageValue: "50"
+  # Custom metrics - query duration
+  - type: Pods
+    pods:
+      metric:
+        name: postgresql_query_duration_seconds
+      target:
+        type: AverageValue
+        averageValue: "100m"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 180
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 120
+      selectPolicy: Max
+
+---
+# Custom Metrics API Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-metrics-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: custom-metrics
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  config.yaml: |
+    # Custom metrics configuration for HPA
+    metrics:
+      # HTTP metrics
+      http_requests_per_second:
+        query: 'rate(http_requests_total[1m])'
+        description: 'HTTP requests per second'
+      
+      http_request_duration_seconds:
+        query: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))'
+        description: '95th percentile HTTP request duration'
+      
+      # Nginx metrics
+      nginx_connections_active:
+        query: 'nginx_connections_active'
+        description: 'Active nginx connections'
+      
+      # Redis metrics
+      redis_connected_clients:
+        query: 'redis_connected_clients'
+        description: 'Number of connected Redis clients'
+      
+      redis_instantaneous_ops_per_sec:
+        query: 'redis_instantaneous_ops_per_sec'
+        description: 'Redis operations per second'
+      
+      # PostgreSQL metrics
+      postgresql_connections_active:
+        query: 'postgresql_connections{state="active"}'
+        description: 'Active PostgreSQL connections'
+      
+      postgresql_query_duration_seconds:
+        query: 'histogram_quantile(0.95, rate(postgresql_query_duration_seconds_bucket[5m]))'
+        description: '95th percentile PostgreSQL query duration'
+      
+      # CQRS metrics
+      cqrs_command_duration_seconds:
+        query: 'histogram_quantile(0.95, rate(cqrs_command_duration_seconds_bucket[5m]))'
+        description: '95th percentile CQRS command duration'
+      
+      cqrs_query_duration_seconds:
+        query: 'histogram_quantile(0.95, rate(cqrs_query_duration_seconds_bucket[5m]))'
+        description: '95th percentile CQRS query duration'
+      
+      # Event sourcing metrics
+      event_store_append_duration_seconds:
+        query: 'histogram_quantile(0.95, rate(event_store_append_duration_seconds_bucket[5m]))'
+        description: '95th percentile event store append duration'
+      
+      projection_lag_seconds:
+        query: 'projection_lag_seconds'
+        description: 'Projection lag in seconds'
+
+---
+# HPA Status Monitor
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hpa-monitor-script
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: hpa-monitor
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  monitor.sh: |
+    #!/bin/bash
+    # HPA monitoring script
+    
+    echo "=== HPA Status Monitor ==="
+    echo "Timestamp: $(date)"
+    echo
+    
+    # Check all HPAs
+    kubectl get hpa -n free-deep-research -o wide
+    echo
+    
+    # Detailed status for each HPA
+    for hpa in $(kubectl get hpa -n free-deep-research -o name); do
+        echo "=== $hpa ==="
+        kubectl describe $hpa -n free-deep-research
+        echo
+    done
+    
+    # Check custom metrics availability
+    echo "=== Custom Metrics ==="
+    kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1" | jq .
+    echo
+    
+    # Check resource metrics
+    echo "=== Resource Metrics ==="
+    kubectl top pods -n free-deep-research
+    echo
+    kubectl top nodes
+    echo
