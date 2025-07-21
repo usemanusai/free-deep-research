@@ -1,0 +1,314 @@
+# MLflow Storage Configuration for Free Deep Research System
+# Phase 4.6: AI/ML Pipeline Enhancement
+
+# MinIO for S3-compatible artifact storage
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minio-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/component: object-storage
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  config.env: |
+    MINIO_ROOT_USER=minio
+    MINIO_ROOT_PASSWORD=minio123
+    MINIO_BROWSER=on
+    MINIO_DOMAIN=minio.freedeepresearch.org
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-secret
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/component: object-storage
+    app.kubernetes.io/part-of: free-deep-research-system
+type: Opaque
+data:
+  # Base64 encoded credentials
+  root-user: bWluaW8=  # minio
+  root-password: bWluaW8xMjM=  # minio123
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/component: object-storage
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/component: object-storage
+        app.kubernetes.io/part-of: free-deep-research-system
+    spec:
+      serviceAccountName: fdr-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: minio
+        image: minio/minio:RELEASE.2023-11-20T22-40-07Z
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - minio server /data --console-address :9001
+        ports:
+        - containerPort: 9000
+          name: api
+          protocol: TCP
+        - containerPort: 9001
+          name: console
+          protocol: TCP
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: root-user
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: root-password
+        - name: MINIO_BROWSER
+          value: "on"
+        - name: MINIO_DOMAIN
+          value: "minio.freedeepresearch.org"
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: minio-data
+        persistentVolumeClaim:
+          claimName: minio-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/component: object-storage
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9000
+    targetPort: 9000
+    protocol: TCP
+    name: api
+  - port: 9001
+    targetPort: 9001
+    protocol: TCP
+    name: console
+  selector:
+    app: minio
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/component: object-storage
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
+
+---
+# Job to create MLflow bucket in MinIO
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-setup
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: minio-setup
+    app.kubernetes.io/component: object-storage
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  template:
+    metadata:
+      labels:
+        app: minio-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: mc
+        image: minio/mc:RELEASE.2023-11-20T16-30-59Z
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Wait for MinIO to be ready
+          until mc alias set minio http://minio-service:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD; do
+            echo "Waiting for MinIO to be ready..."
+            sleep 5
+          done
+          
+          # Create MLflow artifacts bucket
+          mc mb minio/mlflow-artifacts --ignore-existing
+          
+          # Set bucket policy for MLflow access
+          mc anonymous set download minio/mlflow-artifacts
+          
+          # Create model storage bucket
+          mc mb minio/model-storage --ignore-existing
+          mc anonymous set download minio/model-storage
+          
+          echo "MinIO setup completed successfully"
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: root-user
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: root-password
+
+---
+# MLflow Database Schema Setup Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mlflow-db-setup
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: mlflow-db-setup
+    app.kubernetes.io/component: model-registry
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  template:
+    metadata:
+      labels:
+        app: mlflow-db-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: mlflow-db-init
+        image: python:3.9-slim
+        command:
+        - /bin/bash
+        - -c
+        - |
+          pip install mlflow[extras]==2.8.1 psycopg2-binary
+          
+          # Initialize MLflow database schema
+          mlflow db upgrade postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-service:5432/$(POSTGRES_DB)
+          
+          echo "MLflow database setup completed"
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          value: "free_deep_research"
+
+---
+# MinIO VirtualService for Istio
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: minio-vs
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/component: object-storage
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  hosts:
+  - minio.freedeepresearch.org
+  gateways:
+  - ml-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: minio-service
+        port:
+          number: 9001  # Console port
+    timeout: 60s
+
+---
+# ServiceMonitor for MinIO metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: minio-metrics
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/component: object-storage
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+  endpoints:
+  - port: api
+    path: /minio/v2/metrics/cluster
+    interval: 30s
+    scrapeTimeout: 10s

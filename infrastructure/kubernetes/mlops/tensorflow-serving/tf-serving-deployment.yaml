@@ -1,0 +1,345 @@
+# TensorFlow Serving Deployment for Free Deep Research System
+# Phase 4.6: AI/ML Pipeline Enhancement
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tf-serving-config
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: tensorflow-serving
+    app.kubernetes.io/component: model-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+data:
+  models.config: |
+    model_config_list {
+      config {
+        name: 'research_pattern_predictor'
+        base_path: '/models/research_pattern_predictor'
+        model_platform: 'tensorflow'
+        model_version_policy {
+          latest {
+            num_versions: 2
+          }
+        }
+      }
+      config {
+        name: 'content_quality_model'
+        base_path: '/models/content_quality_model'
+        model_platform: 'tensorflow'
+        model_version_policy {
+          latest {
+            num_versions: 2
+          }
+        }
+      }
+      config {
+        name: 'recommendation_engine'
+        base_path: '/models/recommendation_engine'
+        model_platform: 'tensorflow'
+        model_version_policy {
+          latest {
+            num_versions: 2
+          }
+        }
+      }
+      config {
+        name: 'anomaly_detector'
+        base_path: '/models/anomaly_detector'
+        model_platform: 'tensorflow'
+        model_version_policy {
+          latest {
+            num_versions: 2
+          }
+        }
+      }
+    }
+  
+  monitoring.config: |
+    prometheus_config {
+      enable: true
+      path: "/monitoring/prometheus/metrics"
+    }
+    
+  batching.config: |
+    max_batch_size { value: 32 }
+    batch_timeout_micros { value: 1000 }
+    max_enqueued_batches { value: 100 }
+    num_batch_threads { value: 4 }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tensorflow-serving
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: tensorflow-serving
+    app.kubernetes.io/component: model-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: tensorflow-serving
+  template:
+    metadata:
+      labels:
+        app: tensorflow-serving
+        app.kubernetes.io/name: tensorflow-serving
+        app.kubernetes.io/component: model-serving
+        app.kubernetes.io/part-of: free-deep-research-system
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8501"
+        prometheus.io/path: "/monitoring/prometheus/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: tensorflow-serving
+        image: tensorflow/serving:2.14.0-gpu
+        imagePullPolicy: IfNotPresent
+        command:
+        - /usr/bin/tensorflow_model_server
+        args:
+        - --port=8500
+        - --rest_api_port=8501
+        - --model_config_file=/etc/tf-serving/models.config
+        - --monitoring_config_file=/etc/tf-serving/monitoring.config
+        - --batching_parameters_file=/etc/tf-serving/batching.config
+        - --enable_batching=true
+        - --max_num_load_retries=3
+        - --file_system_poll_wait_seconds=1
+        - --flush_filesystem_caches=true
+        - --tensorflow_session_parallelism=0
+        - --tensorflow_intra_op_parallelism=0
+        - --tensorflow_inter_op_parallelism=0
+        - --enable_model_warmup=true
+        ports:
+        - containerPort: 8500
+          name: grpc
+          protocol: TCP
+        - containerPort: 8501
+          name: http
+          protocol: TCP
+        env:
+        - name: MODEL_NAME
+          value: "research_models"
+        - name: TF_CPP_MIN_LOG_LEVEL
+          value: "1"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        volumeMounts:
+        - name: tf-serving-config
+          mountPath: /etc/tf-serving
+          readOnly: true
+        - name: model-storage
+          mountPath: /models
+          readOnly: true
+        resources:
+          requests:
+            cpu: 1
+            memory: 2Gi
+          limits:
+            cpu: 4
+            memory: 8Gi
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /v1/models/research_pattern_predictor
+            port: 8501
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /v1/models/research_pattern_predictor
+            port: 8501
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: tf-serving-config
+        configMap:
+          name: tf-serving-config
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: model-storage-pvc
+      nodeSelector:
+        accelerator: nvidia-tesla-k80
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+
+---
+# CPU-only deployment for fallback
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tensorflow-serving-cpu
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: tensorflow-serving-cpu
+    app.kubernetes.io/component: model-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: tensorflow-serving-cpu
+  template:
+    metadata:
+      labels:
+        app: tensorflow-serving-cpu
+        app.kubernetes.io/name: tensorflow-serving-cpu
+        app.kubernetes.io/component: model-serving
+        app.kubernetes.io/part-of: free-deep-research-system
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8501"
+        prometheus.io/path: "/monitoring/prometheus/metrics"
+    spec:
+      serviceAccountName: fdr-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: tensorflow-serving
+        image: tensorflow/serving:2.14.0
+        imagePullPolicy: IfNotPresent
+        command:
+        - /usr/bin/tensorflow_model_server
+        args:
+        - --port=8500
+        - --rest_api_port=8501
+        - --model_config_file=/etc/tf-serving/models.config
+        - --monitoring_config_file=/etc/tf-serving/monitoring.config
+        - --batching_parameters_file=/etc/tf-serving/batching.config
+        - --enable_batching=true
+        - --max_num_load_retries=3
+        - --file_system_poll_wait_seconds=1
+        - --flush_filesystem_caches=true
+        - --enable_model_warmup=true
+        ports:
+        - containerPort: 8500
+          name: grpc
+          protocol: TCP
+        - containerPort: 8501
+          name: http
+          protocol: TCP
+        env:
+        - name: MODEL_NAME
+          value: "research_models"
+        - name: TF_CPP_MIN_LOG_LEVEL
+          value: "1"
+        volumeMounts:
+        - name: tf-serving-config
+          mountPath: /etc/tf-serving
+          readOnly: true
+        - name: model-storage
+          mountPath: /models
+          readOnly: true
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /v1/models/research_pattern_predictor
+            port: 8501
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /v1/models/research_pattern_predictor
+            port: 8501
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: tf-serving-config
+        configMap:
+          name: tf-serving-config
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: model-storage-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tensorflow-serving-service
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: tensorflow-serving
+    app.kubernetes.io/component: model-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8500
+    targetPort: 8500
+    protocol: TCP
+    name: grpc
+  - port: 8501
+    targetPort: 8501
+    protocol: TCP
+    name: http
+  selector:
+    app: tensorflow-serving
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tensorflow-serving-cpu-service
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: tensorflow-serving-cpu
+    app.kubernetes.io/component: model-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8500
+    targetPort: 8500
+    protocol: TCP
+    name: grpc
+  - port: 8501
+    targetPort: 8501
+    protocol: TCP
+    name: http
+  selector:
+    app: tensorflow-serving-cpu
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-storage-pvc
+  namespace: free-deep-research
+  labels:
+    app.kubernetes.io/name: tensorflow-serving
+    app.kubernetes.io/component: model-serving
+    app.kubernetes.io/part-of: free-deep-research-system
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
