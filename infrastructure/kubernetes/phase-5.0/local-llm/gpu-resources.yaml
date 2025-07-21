@@ -1,0 +1,296 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-device-plugin-config
+  namespace: kube-system
+data:
+  config.yaml: |
+    version: v1
+    flags:
+      migStrategy: none
+      failOnInitError: true
+      nvidiaDriverRoot: /run/nvidia/driver
+      plugin:
+        passDeviceSpecs: false
+        deviceListStrategy: envvar
+        deviceIDStrategy: uuid
+    sharing:
+      timeSlicing:
+        resources:
+        - name: nvidia.com/gpu
+          replicas: 4
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+  labels:
+    app: nvidia-device-plugin
+    phase: "5.0"
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds
+        app: nvidia-device-plugin
+    spec:
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      priorityClassName: system-node-critical
+      containers:
+      - image: nvcr.io/nvidia/k8s-device-plugin:v0.15.0
+        name: nvidia-device-plugin-ctr
+        args: ["--fail-on-init-error=false", "--config-file=/etc/kubernetes/device-plugin/config.yaml"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: device-plugin
+          mountPath: /var/lib/kubelet/device-plugins
+        - name: config
+          mountPath: /etc/kubernetes/device-plugin
+        env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: all
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: utility
+      volumes:
+      - name: device-plugin
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+      - name: config
+        configMap:
+          name: gpu-device-plugin-config
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gpu-quota
+  namespace: free-deep-research
+spec:
+  hard:
+    requests.nvidia.com/gpu: "4"
+    limits.nvidia.com/gpu: "4"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: gpu-limit-range
+  namespace: free-deep-research
+spec:
+  limits:
+  - default:
+      nvidia.com/gpu: "1"
+    defaultRequest:
+      nvidia.com/gpu: "0"
+    type: Container
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: gpu-priority
+value: 1000
+globalDefault: false
+description: "Priority class for GPU workloads"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-monitoring-config
+  namespace: free-deep-research
+  labels:
+    app: gpu-monitoring
+    phase: "5.0"
+data:
+  dcgm-exporter.yaml: |
+    # DCGM Exporter configuration for GPU monitoring
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: dcgm-exporter
+      namespace: free-deep-research
+      labels:
+        app: dcgm-exporter
+        phase: "5.0"
+    spec:
+      selector:
+        matchLabels:
+          app: dcgm-exporter
+      template:
+        metadata:
+          labels:
+            app: dcgm-exporter
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "9400"
+            prometheus.io/path: "/metrics"
+        spec:
+          hostNetwork: true
+          hostPID: true
+          containers:
+          - name: dcgm-exporter
+            image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04
+            ports:
+            - containerPort: 9400
+              name: metrics
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+              capabilities:
+                add: ["SYS_ADMIN"]
+            volumeMounts:
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+            env:
+            - name: DCGM_EXPORTER_LISTEN
+              value: ":9400"
+            - name: DCGM_EXPORTER_KUBERNETES
+              value: "true"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: proc
+            hostPath:
+              path: /proc
+          - name: sys
+            hostPath:
+              path: /sys
+          nodeSelector:
+            accelerator: nvidia-tesla-k80
+          tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dcgm-exporter-service
+  namespace: free-deep-research
+  labels:
+    app: dcgm-exporter
+    phase: "5.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9400"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9400
+    targetPort: 9400
+    protocol: TCP
+    name: metrics
+  selector:
+    app: dcgm-exporter
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-node-labeler-config
+  namespace: kube-system
+data:
+  node-labeler.sh: |
+    #!/bin/bash
+    # GPU Node Labeler Script
+    
+    set -euo pipefail
+    
+    # Function to detect GPU type
+    detect_gpu_type() {
+        if nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null | grep -qi "tesla"; then
+            echo "tesla"
+        elif nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null | grep -qi "quadro"; then
+            echo "quadro"
+        elif nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null | grep -qi "geforce"; then
+            echo "geforce"
+        else
+            echo "unknown"
+        fi
+    }
+    
+    # Function to get GPU count
+    get_gpu_count() {
+        nvidia-smi --query-gpu=count --format=csv,noheader,nounits 2>/dev/null | head -1 || echo "0"
+    }
+    
+    # Function to get GPU memory
+    get_gpu_memory() {
+        nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 || echo "0"
+    }
+    
+    # Main labeling logic
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        GPU_TYPE=$(detect_gpu_type)
+        GPU_COUNT=$(get_gpu_count)
+        GPU_MEMORY=$(get_gpu_memory)
+        
+        # Apply labels
+        kubectl label node $(hostname) accelerator=nvidia-${GPU_TYPE} --overwrite
+        kubectl label node $(hostname) gpu-count=${GPU_COUNT} --overwrite
+        kubectl label node $(hostname) gpu-memory=${GPU_MEMORY}Mi --overwrite
+        kubectl label node $(hostname) gpu-enabled=true --overwrite
+        
+        echo "GPU node labeled successfully:"
+        echo "  accelerator: nvidia-${GPU_TYPE}"
+        echo "  gpu-count: ${GPU_COUNT}"
+        echo "  gpu-memory: ${GPU_MEMORY}Mi"
+        echo "  gpu-enabled: true"
+    else
+        kubectl label node $(hostname) gpu-enabled=false --overwrite
+        echo "No GPU detected on this node"
+    fi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-node-labeler
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      hostNetwork: true
+      hostPID: true
+      restartPolicy: OnFailure
+      containers:
+      - name: gpu-labeler
+        image: nvidia/cuda:12.2-runtime-ubuntu22.04
+        command: ["/bin/bash", "/scripts/node-labeler.sh"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: kubectl
+          mountPath: /usr/local/bin/kubectl
+        env:
+        - name: KUBECONFIG
+          value: /etc/kubernetes/admin.conf
+      volumes:
+      - name: scripts
+        configMap:
+          name: gpu-node-labeler-config
+          defaultMode: 0755
+      - name: kubectl
+        hostPath:
+          path: /usr/local/bin/kubectl
+      nodeSelector:
+        kubernetes.io/os: linux

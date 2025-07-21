@@ -1,0 +1,184 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qdrant-storage-pvc
+  namespace: free-deep-research
+  labels:
+    app: qdrant
+    component: vector-database
+    phase: "5.0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qdrant-snapshots-pvc
+  namespace: free-deep-research
+  labels:
+    app: qdrant
+    component: vector-database
+    phase: "5.0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qdrant-config
+  namespace: free-deep-research
+  labels:
+    app: qdrant
+    component: vector-database
+    phase: "5.0"
+data:
+  config.yaml: |
+    log_level: INFO
+    
+    service:
+      host: 0.0.0.0
+      http_port: 6333
+      grpc_port: 6334
+      enable_cors: true
+      enable_tls: false
+      max_request_size_mb: 32
+      max_workers: 0
+      
+    cluster:
+      enabled: true
+      p2p:
+        port: 6335
+      consensus:
+        tick_period_ms: 100
+        
+    storage:
+      storage_path: /qdrant/storage
+      snapshots_path: /qdrant/snapshots
+      temp_path: /tmp
+      
+      # Performance optimizations
+      performance:
+        max_search_threads: 4
+        max_optimization_threads: 2
+        
+      # Memory management
+      optimizers:
+        deleted_threshold: 0.2
+        vacuum_min_vector_number: 1000
+        default_segment_number: 0
+        max_segment_size_kb: 5000000
+        memmap_threshold_kb: 200000
+        indexing_threshold_kb: 20000
+        flush_interval_sec: 5
+        max_optimization_threads: 2
+        
+      # WAL configuration
+      wal:
+        wal_capacity_mb: 32
+        wal_segments_ahead: 0
+        
+      # Quantization settings
+      quantization:
+        ignore_errors: false
+        
+    # Telemetry and monitoring
+    telemetry_disabled: false
+    
+    # API configuration
+    api:
+      enable_ui: true
+      enable_cors: true
+      max_request_size_mb: 32
+      
+    # TLS configuration (disabled for internal cluster communication)
+    tls:
+      cert: null
+      key: null
+      ca_cert: null
+      
+  collection-config.yaml: |
+    # Default collection configurations for different use cases
+    collections:
+      documents:
+        vectors:
+          size: 1536  # OpenAI text-embedding-3-large
+          distance: Cosine
+        optimizers_config:
+          deleted_threshold: 0.2
+          vacuum_min_vector_number: 1000
+          default_segment_number: 0
+          max_segment_size: 20000
+          memmap_threshold: 20000
+          indexing_threshold: 20000
+          flush_interval_sec: 5
+          max_optimization_threads: 1
+        wal_config:
+          wal_capacity_mb: 32
+          wal_segments_ahead: 0
+        hnsw_config:
+          m: 16
+          ef_construct: 100
+          full_scan_threshold: 10000
+          max_indexing_threads: 0
+          on_disk: false
+        quantization_config:
+          scalar:
+            type: int8
+            quantile: 0.99
+            always_ram: true
+            
+      embeddings_small:
+        vectors:
+          size: 768   # sentence-transformers/all-mpnet-base-v2
+          distance: Cosine
+        optimizers_config:
+          deleted_threshold: 0.2
+          vacuum_min_vector_number: 1000
+          default_segment_number: 0
+          max_segment_size: 20000
+          memmap_threshold: 20000
+          indexing_threshold: 20000
+          flush_interval_sec: 5
+          max_optimization_threads: 1
+        wal_config:
+          wal_capacity_mb: 32
+          wal_segments_ahead: 0
+        hnsw_config:
+          m: 16
+          ef_construct: 100
+          full_scan_threshold: 10000
+          max_indexing_threads: 0
+          on_disk: false
+          
+      conversations:
+        vectors:
+          size: 1536  # For conversation embeddings
+          distance: Cosine
+        optimizers_config:
+          deleted_threshold: 0.2
+          vacuum_min_vector_number: 1000
+          default_segment_number: 0
+          max_segment_size: 10000
+          memmap_threshold: 10000
+          indexing_threshold: 10000
+          flush_interval_sec: 10
+          max_optimization_threads: 1
+        wal_config:
+          wal_capacity_mb: 16
+          wal_segments_ahead: 0
+        hnsw_config:
+          m: 16
+          ef_construct: 100
+          full_scan_threshold: 5000
+          max_indexing_threads: 0
+          on_disk: false
